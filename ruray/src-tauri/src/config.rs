@@ -12,6 +12,54 @@ use std::path::PathBuf;
 
 use crate::commands::ServerInfo;
 
+/// 为 rule_type 字段提供默认值
+fn default_rule_type() -> String {
+    "field".to_string()
+}
+
+/// 路由规则结构体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingRule {
+    #[serde(rename = "type", alias = "rule_type", default = "default_rule_type")]
+    pub rule_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ip: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain: Option<Vec<String>>,
+    #[serde(rename = "outboundTag", alias = "outbound_tag")]
+    pub outbound_tag: String,
+}
+
+/// 路由配置结构体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingConfig {
+    #[serde(rename = "domainStrategy", default = "default_domain_strategy")]
+    pub domain_strategy: String,
+    #[serde(default)]
+    pub rules: Vec<RoutingRule>,
+}
+
+impl Default for RoutingConfig {
+    fn default() -> Self {
+        Self {
+            domain_strategy: "AsIs".to_string(),
+            rules: vec![
+                RoutingRule {
+                    rule_type: "field".to_string(),
+                    ip: Some(vec!["geoip:private".to_string()]),
+                    domain: None,
+                    outbound_tag: "direct".to_string(),
+                }
+            ],
+        }
+    }
+}
+
+/// 为 domain_strategy 字段提供默认值
+fn default_domain_strategy() -> String {
+    "AsIs".to_string()
+}
+
 /// 为theme_color字段提供默认值
 fn default_theme_color() -> String {
     "green".to_string()
@@ -51,6 +99,9 @@ pub struct AppConfig {
     pub inbound_allow_transparent: bool,
     /// Xray Core 可执行文件路径
     pub xray_path: Option<String>,
+    /// 路由配置
+    #[serde(default)]
+    pub routing_config: RoutingConfig,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -95,6 +146,7 @@ impl Default for AppConfig {
             inbound_auth_method: "noauth".to_string(),
             inbound_allow_transparent: false,
             xray_path: None,
+            routing_config: RoutingConfig::default(),
             created_at: chrono::Utc::now().to_rfc3339(),
             updated_at: chrono::Utc::now().to_rfc3339(),
         }

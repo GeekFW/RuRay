@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use serde_json::json;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use tokio::time::Duration;
 use tokio::process::Command as TokioCommand;
@@ -23,8 +23,23 @@ pub struct ProxyManager {
     current_server: Arc<Mutex<Option<String>>>,
 }
 
+// 全局单例实例
+static PROXY_MANAGER: OnceLock<ProxyManager> = OnceLock::new();
+
 impl ProxyManager {
-    /// 创建新的代理管理器实例
+    /// 获取全局代理管理器实例（单例模式）
+    pub fn instance() -> &'static ProxyManager {
+        PROXY_MANAGER.get_or_init(|| {
+            Self {
+                process: Arc::new(Mutex::new(None)),
+                start_time: Arc::new(Mutex::new(None)),
+                current_server: Arc::new(Mutex::new(None)),
+            }
+        })
+    }
+
+    /// 创建新的代理管理器实例（已弃用，请使用 instance()）
+    #[deprecated(note = "请使用 ProxyManager::instance() 获取单例实例")]
     pub fn new() -> Self {
         Self {
             process: Arc::new(Mutex::new(None)),
@@ -48,8 +63,8 @@ impl ProxyManager {
         // 生成 Xray 配置
         let config = self.generate_xray_config(server)?;
         
-        // 保存配置到指定目录
-        let config_path = self.save_temp_config(&config, server)?;
+        // 保存配置到指定目录（如果配置文件已存在则不重新创建）
+        let config_path = self.save_temp_config(&config, server, false)?;
         
         // 启动 Xray Core 进程
         let child = Command::new(&xray_executable)
@@ -289,16 +304,49 @@ impl ProxyManager {
 
     /// 获取代理状态
     pub async fn get_status(&self) -> Result<ProxyStatus> {
-        let process = self.process.lock().unwrap();
-        let start_time = self.start_time.lock().unwrap();
-        let current_server = self.current_server.lock().unwrap();
         let config = AppConfig::load()?;
 
-        let is_running = process.is_some();
-        let uptime = if let Some(start) = *start_time {
-            start.elapsed().as_secs()
+        // 获取状态信息，立即释放锁
+        let (is_running, uptime, current_server_id) = {
+            let process = self.process.lock().unwrap();
+            let start_time = self.start_time.lock().unwrap();
+            let current_server = self.current_server.lock().unwrap();
+
+            let is_running = process.is_some();
+            let uptime = if let Some(start) = *start_time {
+                start.elapsed().as_secs()
+            } else {
+                0
+            };
+
+            (is_running, uptime, current_server.clone())
+        };
+
+        // 根据服务器ID查找服务器名称
+        let current_server_name = if let Some(ref server_id) = current_server_id {
+            config.servers.iter()
+                .find(|server| server.id == *server_id)
+                .map(|server| server.name.clone())
         } else {
-            0
+            None
+        };
+
+        // 确定代理状态
+        let status = if !is_running {
+            "disconnected".to_string()
+        } else {
+            // 进程正在运行，测试连接
+            if current_server_id.is_some() {
+                // 这里应该根据server_id获取服务器信息并测试连接
+                // 为了简化，我们先检查进程是否健康运行
+                if self.is_process_healthy().await {
+                    "connected".to_string()
+                } else {
+                    "connecting".to_string()
+                }
+            } else {
+                "connecting".to_string()
+            }
         };
 
         // TODO: 实现真实的流量统计
@@ -309,7 +357,8 @@ impl ProxyManager {
 
         Ok(ProxyStatus {
             is_running,
-            current_server: current_server.clone(),
+            status,
+            current_server: current_server_name,
             proxy_mode: config.proxy_mode,
             uptime,
             upload_speed,
@@ -317,6 +366,45 @@ impl ProxyManager {
             total_upload,
             total_download,
         })
+    }
+
+    /// 检查进程是否健康运行
+    async fn is_process_healthy(&self) -> bool {
+        // 获取PID并立即释放锁
+        let pid_opt = {
+            let process = self.process.lock().unwrap();
+            process.as_ref().map(|child| child.id())
+        };
+        
+        if let Some(pid) = pid_opt {
+            // 在Windows上检查进程是否存在
+            #[cfg(target_os = "windows")]
+            {
+                let output = TokioCommand::new("tasklist")
+                    .args(&["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
+                    .output()
+                    .await;
+                
+                if let Ok(output) = output {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    return !stdout.trim().is_empty() && !stdout.contains("INFO: No tasks");
+                }
+            }
+            
+            // 在Unix系统上检查进程是否存在
+            #[cfg(not(target_os = "windows"))]
+            {
+                let output = TokioCommand::new("ps")
+                    .args(&["-p", &pid.to_string()])
+                    .output()
+                    .await;
+                
+                if let Ok(output) = output {
+                    return output.status.success();
+                }
+            }
+        }
+        false
     }
 
     /// 测试服务器连接
@@ -448,13 +536,23 @@ impl ProxyManager {
                 }
             ],
             "routing": {
-                "rules": [
-                    {
-                        "type": "field",
-                        "ip": ["geoip:private"],
-                        "outboundTag": "direct"
+                "domainStrategy": config.routing_config.domain_strategy,
+                "rules": config.routing_config.rules.iter().map(|rule| {
+                    let mut rule_json = json!({
+                        "type": rule.rule_type,
+                        "outboundTag": rule.outbound_tag
+                    });
+                    
+                    if let Some(ref ip) = rule.ip {
+                        rule_json["ip"] = json!(ip);
                     }
-                ]
+                    
+                    if let Some(ref domain) = rule.domain {
+                        rule_json["domain"] = json!(domain);
+                    }
+                    
+                    rule_json
+                }).collect::<Vec<_>>()
             }
         });
 
@@ -711,7 +809,15 @@ impl ProxyManager {
     /// 保存临时配置文件
     /// 将配置文件保存到运行目录下的 server/conf/ 目录中
     /// 根据服务器ID和名称生成唯一的配置文件名
-    fn save_temp_config(&self, config: &serde_json::Value, server: &ServerInfo) -> Result<std::path::PathBuf> {
+    /// 
+    /// # 参数
+    /// * `config` - Xray 配置 JSON
+    /// * `server` - 服务器信息
+    /// * `force_recreate` - 是否强制重新创建配置文件，如果为 false 且文件已存在则跳过创建
+    /// 
+    /// # 返回值
+    /// * `PathBuf` - 配置文件的完整路径
+    fn save_temp_config(&self, config: &serde_json::Value, server: &ServerInfo, force_recreate: bool) -> Result<std::path::PathBuf> {
         let config_dir = AppConfig::servers_dir()?;
         
         // 生成唯一的配置文件名：服务器ID_服务器名称_xray_config.json
@@ -723,11 +829,38 @@ impl ProxyManager {
         let config_filename = format!("{}_{}_xray_config.json", server.id, safe_name);
         let config_path = config_dir.join(config_filename);
         
+        // 如果不强制重新创建且文件已存在，则直接返回路径
+        if !force_recreate && config_path.exists() {
+            return Ok(config_path);
+        }
+        
         let config_str = serde_json::to_string_pretty(config)
             .context("无法序列化 Xray 配置")?;
         
         std::fs::write(&config_path, config_str)
             .context("无法写入配置文件")?;
+        
+        Ok(config_path)
+    }
+
+    /// 重新生成服务器配置文件
+    /// 强制重新生成指定服务器的配置文件，覆盖现有文件
+    /// 
+    /// # 参数
+    /// * `server` - 服务器信息
+    /// 
+    /// # 返回值
+    /// * `PathBuf` - 配置文件的完整路径
+    /// 
+    /// # 异常
+    /// * 当生成配置失败时返回错误
+    /// * 当保存配置文件失败时返回错误
+    pub async fn regenerate_config(&self, server: &ServerInfo) -> Result<std::path::PathBuf> {
+        // 生成 Xray 配置
+        let config = self.generate_xray_config(server)?;
+        
+        // 强制重新创建配置文件
+        let config_path = self.save_temp_config(&config, server, true)?;
         
         Ok(config_path)
     }

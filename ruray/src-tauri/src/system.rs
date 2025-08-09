@@ -6,29 +6,62 @@
 
 use anyhow::{Context, Result};
 use std::process::Command;
+use sysinfo::{System, Networks};
 
 use crate::commands::SystemStats;
 
 /// 系统管理器
-pub struct SystemManager;
+pub struct SystemManager {
+    system: std::sync::Mutex<System>,
+    networks: std::sync::Mutex<Networks>,
+}
 
 impl SystemManager {
     /// 创建新的系统管理器实例
     pub fn new() -> Self {
-        Self
+        Self {
+            system: std::sync::Mutex::new(System::new_all()),
+            networks: std::sync::Mutex::new(Networks::new_with_refreshed_list()),
+        }
     }
 
     /// 获取系统统计信息
     pub async fn get_stats(&self) -> Result<SystemStats> {
-        // TODO: 实现真实的系统统计信息获取
-        // 这里暂时返回模拟数据
+        let mut system = self.system.lock().unwrap();
+        let mut networks = self.networks.lock().unwrap();
+        
+        // 刷新系统信息
+        system.refresh_all();
+        networks.refresh();
+        
+        // 获取CPU使用率（所有核心的平均值）
+        let cpu_usage = system.global_cpu_info().cpu_usage();
+        
+        // 获取内存信息
+        let memory_total = system.total_memory();
+        let memory_used = system.used_memory();
+        let memory_usage = if memory_total > 0 {
+            (memory_used as f32 / memory_total as f32) * 100.0
+        } else {
+            0.0
+        };
+        
+        // 获取网络统计信息
+        let mut total_received = 0;
+        let mut total_transmitted = 0;
+        
+        for (_interface_name, network) in networks.iter() {
+            total_received += network.received();
+            total_transmitted += network.transmitted();
+        }
+        
         Ok(SystemStats {
-            cpu_usage: rand::random::<f32>() * 100.0,
-            memory_usage: rand::random::<f32>() * 100.0,
-            memory_total: 16 * 1024 * 1024 * 1024, // 16GB
-            memory_used: (rand::random::<u64>() % 8) * 1024 * 1024 * 1024, // 0-8GB
-            network_upload: rand::random::<u64>() % 1024 * 1024,
-            network_download: rand::random::<u64>() % 1024 * 1024 * 10,
+            cpu_usage,
+            memory_usage,
+            memory_total,
+            memory_used,
+            network_upload: total_transmitted,
+            network_download: total_received,
         })
     }
 

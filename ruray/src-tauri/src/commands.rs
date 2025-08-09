@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::State;
+use tauri::{Emitter, State};
 use uuid::Uuid;
 
 use crate::config::{AppConfig, ServerConfig};
@@ -31,6 +31,7 @@ pub struct ServerInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProxyStatus {
     pub is_running: bool,
+    pub status: String, // "connected" | "connecting" | "disconnected"
     pub current_server: Option<String>,
     pub proxy_mode: String,
     pub uptime: u64,
@@ -103,7 +104,7 @@ pub async fn delete_server(server_id: String) -> Result<(), String> {
     
     if let Some(server) = server_to_delete {
         // 清理对应的配置文件
-        let proxy_manager = ProxyManager::new();
+        let proxy_manager = ProxyManager::instance();
         let _ = proxy_manager.cleanup_server_config(&server.id, &server.name);
     }
     
@@ -120,7 +121,7 @@ pub async fn test_server_connection(server_id: String) -> Result<serde_json::Val
     
     if let Some(server) = config.servers.iter().find(|s| s.id == server_id) {
         // 创建临时的代理管理器进行测试
-        let proxy_manager = ProxyManager::new();
+        let proxy_manager = ProxyManager::instance();
         
         let start_time = std::time::Instant::now();
         
@@ -162,7 +163,7 @@ pub async fn start_proxy(server_id: String) -> Result<(), String> {
     let config = AppConfig::load().map_err(|e| e.to_string())?;
     
     if let Some(server) = config.servers.iter().find(|s| s.id == server_id) {
-        let proxy_manager = ProxyManager::new();
+        let proxy_manager = ProxyManager::instance();
         
         // 启动代理服务
         proxy_manager.start(server).await.map_err(|e| e.to_string())?;
@@ -209,7 +210,7 @@ pub async fn start_proxy(server_id: String) -> Result<(), String> {
 /// 停止代理服务并自动清除系统代理设置
 #[tauri::command]
 pub async fn stop_proxy() -> Result<(), String> {
-    let proxy_manager = ProxyManager::new();
+    let proxy_manager = ProxyManager::instance();
     
     // 停止代理服务
     proxy_manager.stop().await.map_err(|e| e.to_string())?;
@@ -226,7 +227,7 @@ pub async fn stop_proxy() -> Result<(), String> {
 /// 获取代理状态
 #[tauri::command]
 pub async fn get_proxy_status() -> Result<ProxyStatus, String> {
-    let proxy_manager = ProxyManager::new();
+    let proxy_manager = ProxyManager::instance();
     proxy_manager.get_status().await.map_err(|e| e.to_string())
 }
 
@@ -276,7 +277,7 @@ pub async fn cleanup_unused_configs() -> Result<(), String> {
     let config = AppConfig::load().map_err(|e| e.to_string())?;
     let active_server_ids: Vec<String> = config.servers.iter().map(|s| s.id.clone()).collect();
     
-    let proxy_manager = ProxyManager::new();
+    let proxy_manager = ProxyManager::instance();
     proxy_manager.cleanup_unused_configs(&active_server_ids).map_err(|e| e.to_string())?;
     
     Ok(())
@@ -294,6 +295,27 @@ pub async fn check_xray_update() -> Result<Option<String>, String> {
 pub async fn download_xray_update(version: String) -> Result<(), String> {
     let xray_manager = XrayManager::new();
     xray_manager.download_update(&version).await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 下载 Xray Core 更新（带进度回调）
+#[tauri::command]
+pub async fn download_xray_update_with_progress(
+    app_handle: tauri::AppHandle,
+    version: String,
+) -> Result<(), String> {
+    let xray_manager = XrayManager::new();
+    
+    xray_manager.download_update_with_progress(&version, |current, total, message| {
+        let progress = if total > 0 { (current * 100 / total) as u32 } else { 0 };
+        
+        // 发送进度事件到前端
+        let _ = app_handle.emit("xray-download-progress", serde_json::json!({
+            "progress": progress,
+            "message": message
+        }));
+    }).await.map_err(|e| e.to_string())?;
+    
     Ok(())
 }
 
@@ -317,6 +339,60 @@ pub async fn get_xray_path() -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
+/// 下载地理位置数据文件（geoip.dat 和 geosite.dat）
+/// 
+/// # 参数
+/// * `app_handle` - Tauri 应用句柄，用于发送进度事件
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 下载结果
+#[tauri::command]
+pub async fn download_geo_files(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let xray_manager = XrayManager::new();
+    
+    xray_manager.download_geo_files(|progress, total, message| {
+        let _ = app_handle.emit("geo-download-progress", serde_json::json!({
+            "progress": progress,
+            "total": total,
+            "message": message
+        }));
+    }).await.map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+/// 检查地理位置数据文件是否存在
+/// 
+/// # 返回值
+/// * `Result<bool, String>` - 文件是否都存在
+#[tauri::command]
+pub async fn check_geo_files_exist() -> Result<bool, String> {
+    let xray_manager = XrayManager::new();
+    xray_manager.check_geo_files_exist().map_err(|e| e.to_string())
+}
+
+/// 确保所有 Xray 文件都存在（可执行文件和地理位置数据文件）
+/// 
+/// # 参数
+/// * `app_handle` - Tauri 应用句柄，用于发送进度事件
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 检查和下载结果
+#[tauri::command]
+pub async fn ensure_xray_files(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let xray_manager = XrayManager::new();
+    
+    xray_manager.ensure_all_files(|progress, total, message| {
+        let _ = app_handle.emit("xray-setup-progress", serde_json::json!({
+            "progress": progress,
+            "total": total,
+            "message": message
+        }));
+    }).await.map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
 /// 测试 Xray 配置有效性
 /// 测试 Xray 配置的有效性
 /// 
@@ -337,7 +413,7 @@ pub async fn test_xray_config(server_id: String) -> Result<String, String> {
     let config = AppConfig::load().map_err(|e| format!("加载配置失败: {}", e))?;
     
     if let Some(server) = config.servers.iter().find(|s| s.id == server_id) {
-        let proxy_manager = ProxyManager::new();
+        let proxy_manager = ProxyManager::instance();
         
         // 检查 Xray Core 是否存在
         let xray_executable = AppConfig::xray_executable().map_err(|e| format!("获取 Xray 路径失败: {}", e))?;
@@ -410,6 +486,36 @@ pub async fn import_config(config_json: String) -> Result<(), String> {
     config.save().map_err(|e| e.to_string())
 }
 
+/// 重新生成服务器配置文件
+/// 强制重新生成指定服务器的配置文件，覆盖现有文件
+/// 
+/// # 参数
+/// * `server_id` - 服务器ID
+/// 
+/// # 返回值
+/// * `Ok(())` - 成功重新生成配置文件
+/// * `Err(String)` - 重新生成失败的错误信息
+/// 
+/// # 异常
+/// * 当服务器不存在时返回错误
+/// * 当生成配置文件失败时返回错误
+#[tauri::command]
+pub async fn regenerate_server_config(server_id: String) -> Result<(), String> {
+    let config = AppConfig::load().map_err(|e| format!("加载配置失败: {}", e))?;
+    
+    if let Some(server) = config.servers.iter().find(|s| s.id == server_id) {
+        let proxy_manager = ProxyManager::instance();
+        
+        proxy_manager.regenerate_config(server).await.map_err(|e| {
+            format!("重新生成配置文件失败: {}", e)
+        })?;
+        
+        Ok(())
+    } else {
+        Err("服务器不存在".to_string())
+    }
+}
+
 /// 打开服务器配置文件
 /// 打开指定服务器的配置文件，如果文件不存在则打开配置目录
 /// 
@@ -428,7 +534,7 @@ pub async fn open_server_config_file(server_id: String) -> Result<(), String> {
     let config = AppConfig::load().map_err(|e| format!("加载配置失败: {}", e))?;
     
     if let Some(server) = config.servers.iter().find(|s| s.id == server_id) {
-        let proxy_manager = ProxyManager::new();
+        let proxy_manager = ProxyManager::instance();
         
         // 获取服务器配置文件路径
         let config_file_path = proxy_manager.get_server_config_path(&server.id, &server.name);

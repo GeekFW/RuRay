@@ -60,6 +60,7 @@
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">代理模式</label>
         <USelectMenu
           v-model="proxyMode"
+          value-attribute="value"
           :options="proxyModeOptions"
           @change="changeProxyMode"
         />
@@ -89,8 +90,13 @@
         <div class="space-y-1">
           <!-- 第一行：服务器名称和协议类型 -->
           <div class="flex items-center space-x-3 mb-1">
-            <div :class="['status-indicator', getStatusClass(server.status)]">
-              <span class="text-sm font-medium">{{ server.name }}</span>
+            <div :class="['status-indicator', getStatusClass(server.status)]" class="flex-1 min-w-0">
+              <span 
+                class="text-sm font-medium truncate block max-w-[150px] sm:max-w-[200px] md:max-w-[250px]" 
+                :title="server.name"
+              >
+                {{ server.name }}
+              </span>
               <!-- 运行状态指示器 -->
               <span v-if="server.id === runningServerId" class="ml-2 inline-flex items-center">
                 <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -107,11 +113,11 @@
           </div>
           
           <!-- 第二行：操作按钮 -->
-          <div class="flex items-center space-x-1 mb-1">
+          <div class="flex items-center space-x-0.5 mb-1">
             <!-- 激活/停止按钮 -->
             <UButton
               variant="ghost"
-              size="sm"
+              size="xs"
               :color="getActivationButtonColor(server.id)"
               @click.stop="toggleServerActivation(server.id)"
               :loading="server.activating"
@@ -123,7 +129,7 @@
             <!-- 测试连接 -->
             <UButton
               variant="ghost"
-              size="sm"
+              size="xs"
               @click.stop="testConnection(server.id)"
               :loading="server.testing"
               title="测试连接"
@@ -134,7 +140,7 @@
             <!-- 测试配置 -->
             <UButton
               variant="ghost"
-              size="sm"
+              size="xs"
               @click.stop="testConfig(server.id)"
               :loading="server.configTesting"
               title="测试配置"
@@ -145,7 +151,7 @@
             <!-- 编辑 -->
             <UButton
               variant="ghost"
-              size="sm"
+              size="xs"
               @click.stop="editServer(server)"
               title="编辑服务器"
             >
@@ -155,17 +161,28 @@
             <!-- 打开配置文件 -->
             <UButton
               variant="ghost"
-              size="sm"
+              size="xs"
               @click.stop="openConfigFile(server)"
               title="打开配置文件"
             >
               <Icon name="heroicons:folder-open" class="w-4 h-4" />
             </UButton>
             
+            <!-- 刷新配置 -->
+            <UButton
+              variant="ghost"
+              size="xs"
+              @click.stop="regenerateConfig(server?.id)"
+              :loading="server.regenerating"
+              title="重新生成配置文件"
+            >
+              <Icon name="heroicons:arrow-path" class="w-4 h-4" />
+            </UButton>
+            
             <!-- 删除 -->
             <UButton
               variant="ghost"
-              size="sm"
+              size="xs"
               color="red"
               @click.stop="deleteServer(server.id)"
               title="删除服务器"
@@ -217,6 +234,7 @@
           <UFormGroup label="协议类型" required>
             <USelectMenu
               v-model="serverForm.protocol"
+              value-attribute="value"
               :options="protocolOptions"
               @change="onProtocolChange"
             />
@@ -242,6 +260,7 @@
               <UFormGroup label="加密方式">
                 <USelectMenu
                   v-model="serverForm.security"
+                  value-attribute="value"
                   :options="securityOptions"
                 />
               </UFormGroup>
@@ -249,6 +268,7 @@
               <UFormGroup label="传输协议">
                 <USelectMenu
                   v-model="serverForm.network"
+                  value-attribute="value"
                   :options="networkOptions"
                 />
               </UFormGroup>
@@ -384,7 +404,9 @@ interface Server {
   status: 'connected' | 'connecting' | 'disconnected'
   ping?: number
   testing?: boolean
+  configTesting?: boolean
   activating?: boolean
+  regenerating?: boolean
 }
 
 // 状态
@@ -392,7 +414,7 @@ const servers = ref<Server[]>([])
 
 const activeServerId = ref<string | null>(null)
 const runningServerId = ref<string | null>(null) // 当前运行的服务器ID
-const proxyMode = ref('直连模式')
+const proxyMode = ref('direct')
 const showAddServer = ref(false)
 const editingServer = ref<Server | null>(null)
 const draggedIndex = ref<number | null>(null)
@@ -960,6 +982,40 @@ const toggleServerActivation = async (serverId: string) => {
    }
  }
 
+// 重新生成配置文件
+const regenerateConfig = async (serverId: string) => {
+  const server = servers.value.find(s => s.id === serverId)
+  console.log('server', servers.value);
+  
+  if (!server) return
+  
+  server.regenerating = true
+  
+  try {
+    await invoke('regenerate_server_config', { serverId: serverId })
+    
+    // 显示成功通知
+    toast.add({
+      title: '配置已刷新',
+      description: `服务器 "${server.name}" 的配置文件已重新生成`,
+      icon: 'i-heroicons-arrow-path',
+      color: 'green'
+    })
+  } catch (error) {
+    console.error('重新生成配置失败:', error)
+    
+    // 显示错误通知
+    toast.add({
+      title: '刷新失败',
+      description: `无法重新生成配置文件: ${error}`,
+      icon: 'i-heroicons-exclamation-triangle',
+      color: 'red'
+    })
+  } finally {
+    server.regenerating = false
+  }
+}
+
  // 加载服务器列表
   const loadServers = async () => {
     try {
@@ -974,6 +1030,7 @@ const toggleServerActivation = async (serverId: string) => {
         testing: false,
         configTesting: false,
         activating: false,
+        regenerating: false,
         // 从 config 对象中提取配置字段
         uuid: server.config?.uuid || '',
         password: server.config?.password || '',

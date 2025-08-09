@@ -9,6 +9,7 @@
           <!-- 日志级别过滤 -->
           <USelectMenu
             v-model="logLevel"
+            value-attribute="value"
             :options="logLevelOptions"
             size="sm"
           />
@@ -142,7 +143,7 @@ const logs = ref<LogEntry[]>([
   }
 ])
 
-const logLevel = ref('信息')
+const logLevel = ref('info')
 const autoScroll = ref(true)
 
 // 选项

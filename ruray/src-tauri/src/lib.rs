@@ -92,6 +92,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::update_server,
             commands::delete_server,
             commands::test_server_connection,
+            commands::regenerate_server_config,
             commands::open_server_config_file,
             // 代理控制
             commands::start_proxy,
@@ -108,9 +109,13 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // Xray Core 管理
             commands::check_xray_update,
             commands::download_xray_update,
+            commands::download_xray_update_with_progress,
             commands::get_xray_version,
             commands::check_xray_exists,
             commands::get_xray_path,
+            commands::download_geo_files,
+            commands::check_geo_files_exist,
+            commands::ensure_xray_files,
             commands::test_xray_config,
             // 配置管理
             commands::get_app_config,

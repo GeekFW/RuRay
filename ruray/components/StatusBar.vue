@@ -83,11 +83,33 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 
 // 接口定义
 interface Server {
   name: string
   ping: number
+}
+
+interface SystemStats {
+  cpu_usage: number
+  memory_usage: number
+  memory_total: number
+  memory_used: number
+  network_upload: number
+  network_download: number
+}
+
+interface ProxyStatus {
+  is_running: boolean
+  status: string // "connected" | "connecting" | "disconnected"
+  current_server: string | null
+  proxy_mode: string
+  uptime: number
+  upload_speed: number
+  download_speed: number
+  total_upload: number
+  total_download: number
 }
 
 // 状态
@@ -169,36 +191,58 @@ const formatBytes = (bytes: number) => {
 
 const updateSystemStats = async () => {
   try {
-    // TODO: 从 Rust 后端获取真实的系统统计信息
-    // 这里使用模拟数据
+    // 获取真实的系统统计信息
+    const systemStats = await invoke<SystemStats>('get_system_stats')
     
-    // 模拟网络速率变化
-    uploadSpeed.value = Math.random() * 1024 * 1024 // 0-1MB/s
-    downloadSpeed.value = Math.random() * 10 * 1024 * 1024 // 0-10MB/s
-    totalTraffic.value += (uploadSpeed.value + downloadSpeed.value)
+    // 更新系统资源信息
+    cpuUsage.value = Math.round(systemStats.cpu_usage)
+    memoryUsage.value = systemStats.memory_used
     
-    // 模拟 CPU 使用率
-    cpuUsage.value = Math.floor(Math.random() * 20) + 5 // 5-25%
+    // 获取代理状态信息
+    const proxyStatusData = await invoke<ProxyStatus>('get_proxy_status')
     
-    // 模拟内存使用
-    memoryUsage.value = 50 * 1024 * 1024 + Math.random() * 20 * 1024 * 1024 // 50-70MB
     
-    // 模拟代理状态变化
-    if (Math.random() < 0.1) { // 10% 概率改变状态
-      const statuses: Array<'connected' | 'connecting' | 'disconnected'> = ['connected', 'connecting', 'disconnected']
-      proxyStatus.value = statuses[Math.floor(Math.random() * statuses.length)]
-      
-      if (proxyStatus.value === 'connected' && !currentServer.value) {
-        currentServer.value = {
-          name: '示例服务器',
-          ping: Math.floor(Math.random() * 200) + 50
-        }
-      } else if (proxyStatus.value === 'disconnected') {
-        currentServer.value = null
-      }
+    // 更新代理状态 - 使用后端返回的真实状态
+    const statusMap: { [key: string]: 'connected' | 'connecting' | 'disconnected' } = {
+      'connected': 'connected',
+      'connecting': 'connecting',
+      'disconnected': 'disconnected'
     }
+    proxyStatus.value = statusMap[proxyStatusData.status] || 'disconnected'
+    
+    // 更新网络统计
+    uploadSpeed.value = proxyStatusData.upload_speed
+    downloadSpeed.value = proxyStatusData.download_speed
+    totalTraffic.value = proxyStatusData.total_upload + proxyStatusData.total_download
+    
+    // 更新当前服务器信息
+    if (proxyStatusData.current_server && proxyStatusData.is_running) {
+      currentServer.value = {
+        name: proxyStatusData.current_server,
+        ping: 0 // 代理状态中没有ping信息，设为0
+      }
+    } else {
+      currentServer.value = null
+    }
+    
+    // 更新代理模式
+    const modeMap: { [key: string]: 'direct' | 'global' | 'pac' } = {
+      'direct': 'direct',
+      'global': 'global',
+      'pac': 'pac'
+    }
+    proxyMode.value = modeMap[proxyStatusData.proxy_mode] || 'direct'
+    
   } catch (error) {
     console.error('更新系统统计失败:', error)
+    
+    // 如果API调用失败，使用默认值
+    cpuUsage.value = 0
+    memoryUsage.value = 0
+    uploadSpeed.value = 0
+    downloadSpeed.value = 0
+    proxyStatus.value = 'disconnected'
+    currentServer.value = null
   }
 }
 
