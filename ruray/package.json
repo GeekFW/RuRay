@@ -1,0 +1,35 @@
+{
+  "name": "ruray",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev --port 1420",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@fontsource/noto-sans-sc": "^5.2.6",
+    "@nuxt/ui": "^2.18.7",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-fs": "^2",
+    "@tauri-apps/plugin-notification": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-os": "^2",
+    "@tauri-apps/plugin-process": "^2",
+    "@tauri-apps/plugin-shell": "^2",
+    "nuxt": "^3.14.159",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@nuxt/devtools": "^1.6.0",
+    "@tauri-apps/cli": "^2",
+    "typescript": "^5.7.2"
+  }
+}

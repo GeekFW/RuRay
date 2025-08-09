@@ -1,0 +1,242 @@
+/* 中文字体配置 */
+@import '@fontsource/noto-sans-sc/300.css';
+@import '@fontsource/noto-sans-sc/400.css';
+@import '@fontsource/noto-sans-sc/500.css';
+@import '@fontsource/noto-sans-sc/600.css';
+@import '@fontsource/noto-sans-sc/700.css';
+
+/* 全局字体设置 */
+* {
+  font-family: 
+    'Noto Sans SC',
+    'PingFang SC',
+    'Microsoft YaHei',
+    'Hiragino Sans GB',
+    'Source Han Sans CN',
+    'Noto Sans CJK SC',
+    'WenQuanYi Micro Hei',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol',
+    'Noto Color Emoji',
+    sans-serif;
+}
+
+/* 代码字体 */
+code, pre, .font-mono {
+  font-family: 
+    'JetBrains Mono',
+    'Fira Code',
+    'SF Mono',
+    'Monaco',
+    'Inconsolata',
+    'Roboto Mono',
+    'Source Code Pro',
+    'Menlo',
+    'Consolas',
+    'DejaVu Sans Mono',
+    monospace;
+}
+
+/* 数字字体 */
+.font-numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* 字体渲染优化 */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1;
+}
+
+/* 自定义主题色 - 极客绿色 */
+:root {
+  --color-primary-50: #f0fdf4;
+  --color-primary-100: #dcfce7;
+  --color-primary-200: #bbf7d0;
+  --color-primary-300: #86efac;
+  --color-primary-400: #4ade80;
+  --color-primary-500: #22c55e;
+  --color-primary-600: #16a34a;
+  --color-primary-700: #15803d;
+  --color-primary-800: #166534;
+  --color-primary-900: #14532d;
+  --color-primary-950: #052e16;
+}
+
+.dark {
+  --color-primary-50: #052e16;
+  --color-primary-100: #14532d;
+  --color-primary-200: #166534;
+  --color-primary-300: #15803d;
+  --color-primary-400: #16a34a;
+  --color-primary-500: #22c55e;
+  --color-primary-600: #4ade80;
+  --color-primary-700: #86efac;
+  --color-primary-800: #bbf7d0;
+  --color-primary-900: #dcfce7;
+  --color-primary-950: #f0fdf4;
+}
+
+/* 窗口拖拽区域 */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-gray-300));
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-gray-700));
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-gray-400));
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-gray-600));
+}
+
+/* 动画效果 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-enter-from {
+  transform: translateX(-100%);
+}
+
+.slide-leave-to {
+  transform: translateX(100%);
+}
+
+/* 状态指示器 */
+.status-indicator {
+  position: relative;
+}
+
+.status-indicator::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -12px;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: rgb(var(--color-gray-400));
+}
+
+.status-indicator.connected::before {
+  background-color: rgb(var(--color-green-500));
+  box-shadow: 0 0 8px rgb(var(--color-green-500) / 0.5);
+}
+
+.status-indicator.connecting::before {
+  background-color: rgb(var(--color-yellow-500));
+  animation: pulse 1.5s infinite;
+}
+
+.status-indicator.disconnected::before {
+  background-color: rgb(var(--color-red-500));
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 极简模式样式 */
+.minimal-mode {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .minimal-mode {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* 加载动画 */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 网络速率显示 */
+.speed-display {
+  font-family: 
+    'JetBrains Mono',
+    'Fira Code',
+    'SF Mono',
+    'Monaco',
+    'Inconsolata',
+    'Roboto Mono',
+    'Source Code Pro',
+    'Menlo',
+    'Consolas',
+    'DejaVu Sans Mono',
+    monospace;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* 服务器列表项 */
+.server-item {
+  transition: all 0.2s ease;
+}
+
+.server-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .server-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
