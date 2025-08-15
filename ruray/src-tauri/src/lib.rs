@@ -5,13 +5,14 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
-    Manager, Runtime,
+    Manager, Runtime, WindowEvent,
 };
 
 mod commands;
 mod config;
 mod proxy;
 mod system;
+mod tun;
 mod xray;
 
 /// 构建系统托盘菜单
@@ -122,10 +123,22 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::save_app_config,
             commands::import_config,
             commands::export_config,
+            // TUN 模式管理
+            commands::start_tun_mode,
+            commands::stop_tun_mode,
+            commands::get_tun_status,
+            commands::is_tun_running,
+            commands::get_tun_config,
+            commands::update_tun_config,
+            commands::set_tun_system_route,
+            commands::toggle_tun_mode,
         ])
         .setup(|app| {
             // 初始化应用配置
             config::init_app_config()?;
+
+            // 设置TunManager的应用句柄
+            tun::TunManager::instance().set_app_handle(app.handle().clone());
 
             // 创建系统托盘
             let tray_menu = build_tray_menu(app.handle())?;
@@ -140,6 +153,22 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .build(app)?;
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            match event {
+                WindowEvent::CloseRequested { .. } => {
+                     // 在窗口关闭时停止TUN模式
+                     if tun::TunManager::instance().is_running_sync() {
+                         println!("应用关闭中，正在停止TUN模式...");
+                         if let Err(e) = tun::TunManager::instance().stop_sync() {
+                             eprintln!("停止TUN模式失败: {}", e);
+                         } else {
+                             println!("TUN模式已停止");
+                         }
+                     }
+                 }
+                _ => {}
+            }
         });
 
     builder

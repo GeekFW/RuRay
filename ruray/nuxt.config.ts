@@ -75,7 +75,7 @@ export default defineNuxtConfig({
   
   // Enables the development server to be discoverable by other devices when running on iOS physical devices
   devServer: {
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     port: 1420
   },
   

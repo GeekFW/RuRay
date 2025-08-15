@@ -36,6 +36,12 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "resources": [
+      "wintun/bin/amd64/wintun.dll",
+      "wintun/bin/x86/wintun.dll",
+      "wintun/bin/arm64/wintun.dll",
+      "wintun/bin/arm/wintun.dll"
     ]
   },
   "plugins": {}

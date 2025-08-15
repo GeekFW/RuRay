@@ -12,6 +12,7 @@ use uuid::Uuid;
 use crate::config::{AppConfig, ServerConfig};
 use crate::proxy::ProxyManager;
 use crate::system::SystemManager;
+use crate::tun::{TunConfig, TunManager, TunStatus};
 use crate::xray::XrayManager;
 
 /// 服务器信息结构体
@@ -110,6 +111,116 @@ pub async fn delete_server(server_id: String) -> Result<(), String> {
     
     config.servers.retain(|s| s.id != server_id);
     config.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// ==================== TUN 模式相关命令 ====================
+
+/// 启动TUN模式
+/// 
+/// # 参数
+/// * `config` - TUN配置
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 启动结果
+#[tauri::command]
+pub async fn start_tun_mode(config: TunConfig) -> Result<(), String> {
+    let tun_manager = TunManager::instance();
+    tun_manager.start(config).await.map_err(|e| e.to_string())
+}
+
+/// 停止TUN模式
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 停止结果
+#[tauri::command]
+pub async fn stop_tun_mode() -> Result<(), String> {
+    let tun_manager = TunManager::instance();
+    tun_manager.stop().await.map_err(|e| e.to_string())
+}
+
+/// 获取TUN模式状态
+/// 
+/// # 返回值
+/// * `Result<TunStatus, String>` - TUN状态
+#[tauri::command]
+pub async fn get_tun_status() -> Result<TunStatus, String> {
+    let tun_manager = TunManager::instance();
+    Ok(tun_manager.get_status().await)
+}
+
+/// 检查TUN模式是否运行中
+/// 
+/// # 返回值
+/// * `Result<bool, String>` - 是否运行中
+#[tauri::command]
+pub async fn is_tun_running() -> Result<bool, String> {
+    let tun_manager = TunManager::instance();
+    Ok(tun_manager.is_running().await)
+}
+
+/// 获取TUN配置
+/// 
+/// # 返回值
+/// * `Result<TunConfig, String>` - TUN配置
+#[tauri::command]
+pub async fn get_tun_config() -> Result<TunConfig, String> {
+    let tun_manager = TunManager::instance();
+    Ok(tun_manager.get_config().await)
+}
+
+/// 更新TUN配置
+/// 
+/// # 参数
+/// * `config` - 新的TUN配置
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 更新结果
+#[tauri::command]
+pub async fn update_tun_config(config: TunConfig) -> Result<(), String> {
+    let tun_manager = TunManager::instance();
+    tun_manager.update_config(config).await.map_err(|e| e.to_string())
+}
+
+/// 设置系统路由（启用/禁用TUN模式路由）
+/// 
+/// # 参数
+/// * `enable` - 是否启用路由
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 设置结果
+#[tauri::command]
+pub async fn set_tun_system_route(enable: bool) -> Result<(), String> {
+    let tun_manager = TunManager::instance();
+    tun_manager.set_system_route(enable).await.map_err(|e| e.to_string())
+}
+
+/// 切换TUN模式开关
+/// 
+/// # 参数
+/// * `enabled` - 是否启用TUN模式
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 切换结果
+#[tauri::command]
+pub async fn toggle_tun_mode(enabled: bool) -> Result<(), String> {
+    let mut config = AppConfig::load().map_err(|e| e.to_string())?;
+    config.tun_enabled = enabled;
+    config.save().map_err(|e| e.to_string())?;
+    
+    let tun_manager = TunManager::instance();
+    
+    if enabled {
+        // 启用TUN模式
+        let tun_config = config.tun_config.clone();
+        tun_manager.start(tun_config).await.map_err(|e| e.to_string())?;
+        tun_manager.set_system_route(true).await.map_err(|e| e.to_string())?;
+    } else {
+        // 禁用TUN模式
+        tun_manager.set_system_route(false).await.map_err(|e| e.to_string())?;
+        tun_manager.stop().await.map_err(|e| e.to_string())?;
+    }
+    
     Ok(())
 }
 

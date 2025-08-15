@@ -18,12 +18,15 @@
         </span>
       </div>
       
-      <!-- 代理模式 -->
-      <div class="flex items-center space-x-2">
+      <!-- TUN模式开关 -->
+      <div class="flex items-center space-x-2 cursor-pointer" @click="toggleTunMode">
         <Icon name="heroicons:globe-alt" class="w-3 h-3 text-gray-500" />
-        <span class="text-gray-600 dark:text-gray-400">
-          {{ proxyModeText }}
+        <span class="text-gray-600 dark:text-gray-400 select-none" :class="{ 'text-green-600 dark:text-green-400': tunEnabled }">
+          {{ tunModeText }}
         </span>
+        <div class="relative inline-flex h-4 w-7 items-center rounded-full transition-colors" :class="tunEnabled ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'">
+          <span class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform" :class="tunEnabled ? 'translate-x-3.5' : 'translate-x-0.5'"></span>
+        </div>
       </div>
     </div>
     
@@ -85,6 +88,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
+// Toast 通知
+const toast = useToast()
+
 // 接口定义
 interface Server {
   name: string
@@ -116,6 +122,8 @@ interface ProxyStatus {
 const proxyStatus = ref<'connected' | 'connecting' | 'disconnected'>('disconnected')
 const proxyMode = ref<'direct' | 'global' | 'pac'>('direct')
 const currentServer = ref<Server | null>(null)
+const tunEnabled = ref(false)
+const tunStatus = ref<any>(null)
 
 // 网络统计
 const uploadSpeed = ref(0) // bytes/s
@@ -146,6 +154,10 @@ const proxyModeText = computed(() => {
     pac: 'PAC 模式'
   }
   return modeMap[proxyMode.value]
+})
+
+const tunModeText = computed(() => {
+  return tunEnabled.value ? 'TUN模式' : '直连模式'
 })
 
 const uptime = computed(() => {
@@ -197,6 +209,17 @@ const updateSystemStats = async () => {
     // 更新系统资源信息
     cpuUsage.value = Math.round(systemStats.cpu_usage)
     memoryUsage.value = systemStats.memory_used
+    
+    // 获取TUN模式状态
+    try {
+      const tunRunning = await invoke<boolean>('is_tun_running')
+      tunEnabled.value = tunRunning
+      if (tunRunning) {
+        tunStatus.value = await invoke('get_tun_status')
+      }
+    } catch (error) {
+      console.warn('获取TUN状态失败:', error)
+    }
     
     // 获取代理状态信息
     const proxyStatusData = await invoke<ProxyStatus>('get_proxy_status')
@@ -274,9 +297,48 @@ const setCurrentServer = (server: Server | null) => {
   currentServer.value = server
 }
 
+// TUN模式切换
+const toggleTunMode = async () => {
+  try {
+    const newState = !tunEnabled.value
+    await invoke('toggle_tun_mode', { enabled: newState })
+    tunEnabled.value = newState
+    
+    // 显示状态提示
+    if (newState) {
+      toast.add({
+        title: 'TUN模式已启用',
+        description: '虚拟网卡已成功启动',
+        icon: 'i-heroicons-globe-alt',
+        color: 'green'
+      })
+    } else {
+      toast.add({
+        title: 'TUN模式已禁用',
+        description: '虚拟网卡已停止',
+        icon: 'i-heroicons-globe-alt',
+        color: 'gray'
+      })
+    }
+  } catch (error) {
+    console.error('切换TUN模式失败:', error)
+    
+    const errorMessage = typeof error === 'string' ? error : (error as any)?.message || '切换TUN模式失败'
+    
+    // 显示错误通知
+    toast.add({
+      title: 'TUN模式切换失败',
+      description: errorMessage,
+      icon: 'i-heroicons-exclamation-triangle',
+      color: 'red'
+    })
+  }
+}
+
 defineExpose({
   setProxyStatus,
   setProxyMode,
-  setCurrentServer
+  setCurrentServer,
+  toggleTunMode
 })
 </script>

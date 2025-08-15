@@ -15,6 +15,7 @@ use tokio::process::Command as TokioCommand;
 
 use crate::commands::{ProxyStatus, ServerInfo};
 use crate::config::AppConfig;
+use crate::tun::TunManager;
 
 /// 代理管理器
 pub struct ProxyManager {
@@ -53,6 +54,17 @@ impl ProxyManager {
     pub async fn start(&self, server: &ServerInfo) -> Result<()> {
         // 停止现有的代理进程（确保同时只有一个进程运行）
         self.stop().await?;
+        
+        // 检查是否启用了TUN模式
+        let config = AppConfig::load()?;
+        if config.tun_enabled {
+            // 启动TUN模式
+            let tun_manager = TunManager::instance();
+            if let Err(e) = tun_manager.start(config.tun_config.clone()).await {
+                eprintln!("启动TUN模式失败: {}", e);
+                // TUN模式启动失败时，继续使用传统代理模式
+            }
+        }
 
         // 检查 Xray Core 是否存在
         let xray_executable = AppConfig::xray_executable()?;
@@ -123,6 +135,13 @@ impl ProxyManager {
     /// 停止代理
     /// 确保完全终止 Xray Core 进程，包括强制杀死进程
     pub async fn stop(&self) -> Result<()> {
+        // 停止TUN模式（如果正在运行）
+        let tun_manager = TunManager::instance();
+        if tun_manager.is_running().await {
+            if let Err(e) = tun_manager.stop().await {
+                eprintln!("停止TUN模式失败: {}", e);
+            }
+        }
         // 获取进程信息并立即释放锁
         let (child_opt, pid_opt) = {
             let mut process = self.process.lock().unwrap();

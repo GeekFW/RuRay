@@ -11,6 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::commands::ServerInfo;
+use crate::tun::TunConfig;
 
 /// 为 rule_type 字段提供默认值
 fn default_rule_type() -> String {
@@ -102,6 +103,12 @@ pub struct AppConfig {
     /// 路由配置
     #[serde(default)]
     pub routing_config: RoutingConfig,
+    /// TUN模式配置
+    #[serde(default)]
+    pub tun_config: TunConfig,
+    /// 是否启用TUN模式
+    #[serde(default)]
+    pub tun_enabled: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -147,6 +154,8 @@ impl Default for AppConfig {
             inbound_allow_transparent: false,
             xray_path: None,
             routing_config: RoutingConfig::default(),
+            tun_config: TunConfig::default(),
+            tun_enabled: false,
             created_at: chrono::Utc::now().to_rfc3339(),
             updated_at: chrono::Utc::now().to_rfc3339(),
         }
