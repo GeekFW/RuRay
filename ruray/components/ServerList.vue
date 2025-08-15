@@ -375,7 +375,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
 // 全局 composables
@@ -1073,10 +1073,38 @@ const regenerateConfig = async (serverId: string) => {
     }
   }
 
+  // 监听代理状态变化事件
+  const handleProxyStatusChange = (event: any) => {
+    const { is_running, current_server } = event.payload
+    
+    // 更新运行中的服务器ID
+    runningServerId.value = is_running ? current_server : null
+    
+    // 更新所有服务器的状态
+    servers.value.forEach(server => {
+      if (server.id === current_server && is_running) {
+        server.status = 'connected'
+      } else {
+        server.status = 'disconnected'
+      }
+    })
+    
+    console.log('代理状态已更新:', { is_running, current_server })
+  }
+
   // 组件挂载时初始化
   onMounted(async () => {
     await loadServers()
     await initializeProxyStatus()
     await refreshSystemProxyStatus()
+    
+    // 监听代理状态变化事件
+    const { listen } = await import('@tauri-apps/api/event')
+    const unlisten = await listen('proxy-status-changed', handleProxyStatusChange)
+    
+    // 组件卸载时清理监听器
+    onUnmounted(() => {
+      unlisten()
+    })
   })
  </script>
