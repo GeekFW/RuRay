@@ -13,7 +13,7 @@
       <!-- 当前服务器 -->
       <div v-if="currentServer" class="flex items-center space-x-2">
         <Icon name="heroicons:server" class="w-3 h-3 text-gray-500" />
-        <span class="text-gray-600 dark:text-gray-400">
+        <span class="text-gray-600 dark:text-gray-400 max-w-32 truncate" :title="currentServer.name + ' (' + currentServer.ping + 'ms)'">
           {{ currentServer.name }} ({{ currentServer.ping }}ms)
         </span>
       </div>

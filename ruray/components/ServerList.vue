@@ -937,6 +937,9 @@ const toggleServerActivation = async (serverId: string) => {
       runningServerId.value = null
       server.status = 'disconnected'
       
+      // 刷新系统代理状态
+      await refreshSystemProxyStatus()
+      
       // 显示成功通知
       toast.add({
         title: '代理已停止',
@@ -958,6 +961,9 @@ const toggleServerActivation = async (serverId: string) => {
       await invoke('start_proxy', { serverId: serverId })
       runningServerId.value = serverId
       server.status = 'connected'
+      
+      // 刷新系统代理状态
+      await refreshSystemProxyStatus()
       
       // 显示成功通知
       toast.add({

@@ -213,8 +213,20 @@ pub async fn toggle_tun_mode(enabled: bool) -> Result<(), String> {
     if enabled {
         // 启用TUN模式
         let tun_config = config.tun_config.clone();
-        tun_manager.start(tun_config).await.map_err(|e| e.to_string())?;
-        tun_manager.set_system_route(true).await.map_err(|e| e.to_string())?;
+        if let Err(e) = tun_manager.start(tun_config).await {
+            // TUN启动失败时，重置配置并保存
+            let mut reset_config = AppConfig::load().map_err(|e| e.to_string())?;
+            reset_config.tun_enabled = false;
+            reset_config.save().map_err(|e| e.to_string())?;
+            return Err(e.to_string());
+        }
+        if let Err(e) = tun_manager.set_system_route(true).await {
+            // 设置系统路由失败时，重置配置并保存
+            let mut reset_config = AppConfig::load().map_err(|e| e.to_string())?;
+            reset_config.tun_enabled = false;
+            reset_config.save().map_err(|e| e.to_string())?;
+            return Err(e.to_string());
+        }
     } else {
         // 禁用TUN模式
         tun_manager.set_system_route(false).await.map_err(|e| e.to_string())?;

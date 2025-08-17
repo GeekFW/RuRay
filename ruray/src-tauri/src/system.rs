@@ -171,7 +171,7 @@ impl SystemManager {
             .context("无法设置 AutoConfigURL")?;
 
         // 刷新系统设置
-        self.refresh_windows_proxy_settings().await?;
+        // self.refresh_windows_proxy_settings().await?;
 
         Ok(())
     }
@@ -202,7 +202,6 @@ impl SystemManager {
         // 方法1: 使用 Windows API 通知系统设置变更
         #[cfg(target_os = "windows")]
         {
-            use std::ffi::CString;
             use std::ptr;
             
             // 使用 InternetSetOption 刷新代理设置
@@ -232,32 +231,6 @@ impl SystemManager {
                 internet_set_option(ptr::null_mut(), INTERNET_OPTION_REFRESH, ptr::null(), 0);
             }
         }
-
-        // 方法2: 使用 PowerShell 作为备用方案
-        let _output = Command::new("powershell")
-            .args(&[
-                "-Command",
-                r#"
-                # 刷新网络设置
-                try {
-                    # 通知系统代理设置已更改
-                    Add-Type -TypeDefinition @'
-                        using System;
-                        using System.Runtime.InteropServices;
-                        public class WinInet {
-                            [DllImport("wininet.dll", SetLastError = true)]
-                            public static extern bool InternetSetOption(IntPtr hInternet, int dwOption, IntPtr lpBuffer, int dwBufferLength);
-                        }
-'@
-                    [WinInet]::InternetSetOption([IntPtr]::Zero, 39, [IntPtr]::Zero, 0) | Out-Null
-                    [WinInet]::InternetSetOption([IntPtr]::Zero, 37, [IntPtr]::Zero, 0) | Out-Null
-                } catch {
-                    # 如果上述方法失败，使用简单的刷新
-                    [System.Windows.Forms.Application]::DoEvents()
-                }
-                "#
-            ])
-            .output();
 
         Ok(())
     }

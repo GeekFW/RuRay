@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
 /**
@@ -56,11 +56,27 @@ interface Server {
   protocol: string
   ping?: number
   isActive?: boolean
+  status?: 'connected' | 'connecting' | 'disconnected'
+  uuid?: string
+  password?: string
+  username?: string
+  security?: string
+  network?: string
+  path?: string
+  tls?: boolean
+  sni?: string
+  created_at?: string
+  updated_at?: string
 }
 
 // 应用状态
 const isLoading = ref(true)
 const isZenMode = ref(false)
+
+// 服务器列表和当前服务器索引
+const servers = ref<Server[]>([])
+const currentServerIndex = ref(0)
+const runningServerId = ref<string | null>(null)
 
 // 应用数据状态
 const appState = reactive({
@@ -83,39 +99,185 @@ const toggleZenMode = () => {
 /**
  * 切换连接状态
  */
-const toggleConnection = () => {
-  appState.isConnected = !appState.isConnected
-  
+const toggleConnection = async () => {
   if (appState.isConnected) {
-    // 模拟连接成功，设置默认服务器
-    appState.activeServer = {
-      id: '1',
-      name: '测试服务器',
-      address: '127.0.0.1',
-      port: 10086,
-      protocol: 'vmess',
-      ping: 45,
-      isActive: true
-    }
-    startNetworkMonitoring()
-  } else {
     // 断开连接
-    appState.activeServer = null
-    stopNetworkMonitoring()
+    await stopProxy()
+  } else {
+    // 开始连接 - 如果没有服务器启动，默认启动第一个服务器
+    if (servers.value.length === 0) {
+      await loadServers()
+    }
+    
+    if (servers.value.length > 0) {
+      // 如果没有运行中的服务器，启动第一个服务器
+      if (!runningServerId.value) {
+        currentServerIndex.value = 0
+        await startProxy(servers.value[0].id)
+      } else {
+        // 如果已有运行中的服务器，直接连接
+        const runningServer = servers.value.find(s => s.id === runningServerId.value)
+        if (runningServer) {
+          appState.activeServer = runningServer
+          appState.isConnected = true
+          startNetworkMonitoring()
+        }
+      }
+    } else {
+      // 没有服务器配置
+      const toast = useToast()
+      toast.add({
+        title: '无可用服务器',
+        description: '请先添加服务器配置',
+        icon: 'i-heroicons-exclamation-triangle',
+        color: 'orange'
+      })
+    }
   }
 }
 
 /**
  * 切换服务器
  */
-const switchServer = () => {
-  // TODO: 实现服务器切换逻辑
-  console.log('切换服务器')
+const switchServer = async () => {
+  if (servers.value.length <= 1) {
+    const toast = useToast()
+    toast.add({
+      title: '无其他服务器',
+      description: '当前只有一个服务器配置',
+      icon: 'i-heroicons-information-circle',
+      color: 'blue'
+    })
+    return
+  }
+  
+  // 按顺序切换到下一个服务器
+  currentServerIndex.value = (currentServerIndex.value + 1) % servers.value.length
+  const nextServer = servers.value[currentServerIndex.value]
+  
+  // 先停止当前服务器
+  if (runningServerId.value) {
+    await stopProxy()
+  }
+  
+  // 启动新服务器
+  await startProxy(nextServer.id)
 }
 
 // 网络监控定时器
 let networkTimer: NodeJS.Timeout | null = null
 let uptimeTimer: NodeJS.Timeout | null = null
+
+/**
+ * 加载服务器列表
+ */
+const loadServers = async () => {
+  try {
+    const serverList = await invoke('get_servers') as any[]
+    servers.value = serverList.map(server => ({
+      id: server.id,
+      name: server.name,
+      protocol: server.protocol,
+      address: server.address,
+      port: server.port,
+      status: 'disconnected' as const,
+      uuid: server.config?.uuid || '',
+      password: server.config?.password || '',
+      username: server.config?.username || '',
+      security: server.config?.security || 'auto',
+      network: server.config?.network || 'tcp',
+      path: server.config?.path || '',
+      tls: server.config?.tls || false,
+      sni: server.config?.sni || '',
+      created_at: server.created_at,
+      updated_at: server.updated_at
+    }))
+  } catch (error) {
+    console.error('加载服务器列表失败:', error)
+  }
+}
+
+/**
+ * 启动代理服务器
+ */
+const startProxy = async (serverId: string) => {
+  try {
+    await invoke('start_proxy', { serverId })
+    
+    // 更新状态
+    runningServerId.value = serverId
+    const server = servers.value.find(s => s.id === serverId)
+    if (server) {
+      server.status = 'connected'
+      appState.activeServer = server
+      appState.isConnected = true
+      
+      // 更新当前服务器索引
+      currentServerIndex.value = servers.value.findIndex(s => s.id === serverId)
+      
+      startNetworkMonitoring()
+      
+      const toast = useToast()
+      toast.add({
+        title: '连接成功',
+        description: `已连接到服务器 "${server.name}"`,
+        icon: 'i-heroicons-check-circle',
+        color: 'green'
+      })
+    }
+  } catch (error) {
+    console.error('启动代理失败:', error)
+    
+    const toast = useToast()
+    toast.add({
+      title: '连接失败',
+      description: `无法连接到服务器: ${error}`,
+      icon: 'i-heroicons-exclamation-triangle',
+      color: 'red'
+    })
+  }
+}
+
+/**
+ * 停止代理服务器
+ */
+const stopProxy = async () => {
+  try {
+    await invoke('stop_proxy')
+    
+    // 更新状态
+    if (runningServerId.value) {
+      const server = servers.value.find(s => s.id === runningServerId.value)
+      if (server) {
+        server.status = 'disconnected'
+      }
+    }
+    
+    runningServerId.value = null
+    appState.activeServer = null
+    appState.isConnected = false
+    
+    stopNetworkMonitoring()
+    
+    const toast = useToast()
+    toast.add({
+      title: '已断开连接',
+      description: '代理服务已停止',
+      icon: 'i-heroicons-stop-circle',
+      color: 'gray'
+    })
+  } catch (error) {
+    console.error('停止代理失败:', error)
+    
+    const toast = useToast()
+    toast.add({
+      title: '断开失败',
+      description: `无法停止代理服务: ${error}`,
+      icon: 'i-heroicons-exclamation-triangle',
+      color: 'red'
+    })
+  }
+}
 
 /**
  * 开始网络监控
@@ -189,14 +351,81 @@ const checkXrayCore = async () => {
   }
 }
 
+/**
+ * 初始化代理状态
+ */
+const initializeProxyStatus = async () => {
+  try {
+    const status = await invoke('get_proxy_status') as any
+    if (status.is_running && status.current_server) {
+      runningServerId.value = status.current_server
+      
+      // 更新对应服务器的状态
+      const server = servers.value.find(s => s.id === status.current_server)
+      if (server) {
+        server.status = 'connected'
+        appState.activeServer = server
+        appState.isConnected = true
+        currentServerIndex.value = servers.value.findIndex(s => s.id === status.current_server)
+        startNetworkMonitoring()
+      }
+    }
+  } catch (error) {
+    console.error('获取代理状态失败:', error)
+  }
+}
+
+/**
+ * 监听代理状态变化事件
+ */
+const handleProxyStatusChange = (event: any) => {
+  const { is_running, current_server } = event.payload
+  
+  // 更新运行中的服务器ID
+  runningServerId.value = is_running ? current_server : null
+  
+  // 更新所有服务器的状态
+  servers.value.forEach(server => {
+    if (server.id === current_server && is_running) {
+      server.status = 'connected'
+      appState.activeServer = server
+      appState.isConnected = true
+      currentServerIndex.value = servers.value.findIndex(s => s.id === current_server)
+    } else {
+      server.status = 'disconnected'
+      if (server.id === appState.activeServer?.id) {
+        appState.activeServer = null
+        appState.isConnected = false
+      }
+    }
+  })
+  
+  console.log('代理状态已更新:', { is_running, current_server })
+}
+
 // 初始化应用
 onMounted(async () => {
-  // 模拟初始化过程
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  isLoading.value = false
+  // 模拟加载时间
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  
+  // 加载服务器列表
+  await loadServers()
+  
+  // 初始化代理状态
+  await initializeProxyStatus()
+  
+  // 监听代理状态变化事件
+  try {
+    const { listen } = await import('@tauri-apps/api/event')
+    await listen('proxy-status-changed', handleProxyStatusChange)
+  } catch (error) {
+    console.error('监听代理状态变化失败:', error)
+  }
   
   // 检查 Xray Core
   await checkXrayCore()
+  
+  isLoading.value = false
 })
 
 // 设置页面标题

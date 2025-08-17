@@ -53,7 +53,7 @@ CreateAt: 2024-12-19
         </h3>
         
         <div v-if="activeServer" class="text-gray-300">
-          <p class="font-medium">{{ activeServer.name }}</p>
+          <p class="font-medium max-w-48 truncate mx-auto" :title="activeServer.name">{{ activeServer.name }}</p>
           <p class="text-sm text-gray-400">{{ activeServer.address }}:{{ activeServer.port }}</p>
           <div v-if="activeServer.ping" class="flex items-center justify-center space-x-1 mt-1">
             <div :class="[
@@ -146,7 +146,6 @@ CreateAt: 2024-12-19
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 
 /**
  * 服务器接口定义

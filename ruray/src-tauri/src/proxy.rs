@@ -12,6 +12,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use tokio::time::Duration;
 use tokio::process::Command as TokioCommand;
+use sysinfo::System;
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 use crate::commands::{ProxyStatus, ServerInfo};
 use crate::config::AppConfig;
@@ -39,16 +43,6 @@ impl ProxyManager {
         })
     }
 
-    /// 创建新的代理管理器实例（已弃用，请使用 instance()）
-    #[deprecated(note = "请使用 ProxyManager::instance() 获取单例实例")]
-    pub fn new() -> Self {
-        Self {
-            process: Arc::new(Mutex::new(None)),
-            start_time: Arc::new(Mutex::new(None)),
-            current_server: Arc::new(Mutex::new(None)),
-        }
-    }
-
     /// 启动代理
     /// 确保同时只有一个 Xray 进程运行，切换时先停止上一个进程再启动新的进程
     pub async fn start(&self, server: &ServerInfo) -> Result<()> {
@@ -56,13 +50,18 @@ impl ProxyManager {
         self.stop().await?;
         
         // 检查是否启用了TUN模式
-        let config = AppConfig::load()?;
+        let mut config = AppConfig::load()?;
         if config.tun_enabled {
             // 启动TUN模式
             let tun_manager = TunManager::instance();
             if let Err(e) = tun_manager.start(config.tun_config.clone()).await {
                 eprintln!("启动TUN模式失败: {}", e);
-                // TUN模式启动失败时，继续使用传统代理模式
+                // TUN模式启动失败时，禁用TUN模式并保存配置
+                config.tun_enabled = false;
+                if let Err(save_err) = config.save() {
+                    eprintln!("保存配置失败: {}", save_err);
+                }
+                // 继续使用传统代理模式
             }
         }
 
@@ -82,6 +81,7 @@ impl ProxyManager {
         let child = Command::new(&xray_executable)
             .arg("-config")
             .arg(&config_path)
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -198,6 +198,7 @@ impl ProxyManager {
         {
             let output = TokioCommand::new("taskkill")
                 .args(&["/F", "/PID", &pid.to_string()])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
                 .output()
                 .await
                 .context("执行 taskkill 命令失败")?;
@@ -227,39 +228,26 @@ impl ProxyManager {
 
     /// 查找并终止所有 xray 进程
     async fn kill_all_xray_processes(&self) -> Result<()> {
-        #[cfg(target_os = "windows")]
-        {
-            // 使用 tasklist 查找 xray 进程
-            let output = TokioCommand::new("tasklist")
-                .args(&["/FI", "IMAGENAME eq xray.exe", "/FO", "CSV", "/NH"])
-                .output()
-                .await
-                .context("执行 tasklist 命令失败")?;
-            
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                for line in stdout.lines() {
-                    if line.contains("xray.exe") {
-                        // 解析CSV格式的输出获取PID
-                        let parts: Vec<&str> = line.split(',').collect();
-                        if parts.len() >= 2 {
-                            let pid_str = parts[1].trim_matches('"');
-                            if let Ok(pid) = pid_str.parse::<u32>() {
-                                let _ = self.force_kill_process(pid).await;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // 使用 sysinfo 库获取系统进程信息
+        let mut system = System::new();
+        system.refresh_processes();
         
-        #[cfg(not(target_os = "windows"))]
-        {
-            // 使用 pkill 终止所有 xray 进程
-            let _ = TokioCommand::new("pkill")
-                .args(&["-f", "xray"])
-                .output()
-                .await;
+        // 查找所有名为 xray 或 xray.exe 的进程
+        let xray_processes: Vec<u32> = system.processes()
+            .iter()
+            .filter_map(|(pid, process)| {
+                let process_name = process.name().to_lowercase();
+                if process_name == "xray" || process_name == "xray.exe" {
+                    Some(pid.as_u32())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        
+        // 终止找到的所有 xray 进程
+        for pid in xray_processes {
+            let _ = self.force_kill_process(pid).await;
         }
         
         Ok(())
@@ -396,32 +384,13 @@ impl ProxyManager {
         };
         
         if let Some(pid) = pid_opt {
-            // 在Windows上检查进程是否存在
-            #[cfg(target_os = "windows")]
-            {
-                let output = TokioCommand::new("tasklist")
-                    .args(&["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
-                    .output()
-                    .await;
-                
-                if let Ok(output) = output {
-                    let stdout = String::from_utf8_lossy(&output.stdout);
-                    return !stdout.trim().is_empty() && !stdout.contains("INFO: No tasks");
-                }
-            }
+            // 使用 sysinfo 库检查进程是否存在
+            let mut system = System::new();
+            system.refresh_processes();
             
-            // 在Unix系统上检查进程是否存在
-            #[cfg(not(target_os = "windows"))]
-            {
-                let output = TokioCommand::new("ps")
-                    .args(&["-p", &pid.to_string()])
-                    .output()
-                    .await;
-                
-                if let Ok(output) = output {
-                    return output.status.success();
-                }
-            }
+            // 检查指定PID的进程是否存在
+            let pid = sysinfo::Pid::from_u32(pid);
+            return system.process(pid).is_some();
         }
         false
     }
