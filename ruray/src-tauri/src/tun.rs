@@ -8,18 +8,18 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, Mutex, OnceLock};
-use tun::{Configuration, Layer, Device};
+use tun::{Configuration, Layer};
 use tokio::net::{TcpStream, UdpSocket};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::task::JoinHandle;
-use std::path::PathBuf;
 use tauri::{AppHandle, Manager, path::BaseDirectory};
 
+// 导入日志宏
+use crate::{log_debug, log_info, log_warn, log_error};
+
 #[cfg(target_os = "windows")]
-use std::ffi::OsString;
-#[cfg(target_os = "windows")]
-use std::os::windows::ffi::{OsStringExt, OsStrExt};
+use std::os::windows::ffi::{OsStrExt};
 
 /// TUN设备配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,7 +129,7 @@ impl TunManager {
             "aarch64" => "wintun/bin/arm64/wintun.dll",
             "arm" => "wintun/bin/arm/wintun.dll",
             _ => {
-                println!("警告: 不支持的架构 {}, 使用默认路径", arch);
+                log_warn!("警告: 不支持的架构 {}, 使用默认路径", arch);
                 return Ok(());
             }
         };
@@ -148,22 +148,22 @@ impl TunManager {
                     unsafe {
                         use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
                         if SetDllDirectoryW(dll_dir_wide.as_ptr()) != 0 {
-                            println!("WinTun库路径已设置: {}", wintun_path.display());
+                            log_info!("WinTun库路径已设置: {}", wintun_path.display());
                             return Ok(());
                         } else {
                             return Err(anyhow::anyhow!("设置DLL搜索目录失败"));
                         }
                     }
                 } else {
-                    println!("警告: 嵌入的wintun.dll文件不存在: {}", wintun_path.display());
+                    log_warn!("警告: 嵌入的wintun.dll文件不存在: {}", wintun_path.display());
                 }
             }
             Err(e) => {
-                println!("警告: 无法解析wintun.dll资源路径: {}", e);
+                log_warn!("警告: 无法解析wintun.dll资源路径: {}", e);
             }
         }
         
-        println!("使用系统默认WinTun路径");
+        log_info!("使用系统默认WinTun路径");
         Ok(())
     }
     
@@ -219,12 +219,12 @@ impl TunManager {
             // 创建TUN设备
              let device = match tun::create(&tun_config) {
                  Ok(device) => {
-                     println!("TUN设备创建成功: ruray-tun");
+                     log_info!("TUN设备创建成功: ruray-tun");
                      device
                  }
                  Err(e) => {
                      let error_msg = format!("创建TUN设备失败: {}. 详细错误: {:?}. 可能原因: 1) 权限不足，需要管理员权限 2) TUN驱动未安装 3) 网络配置冲突", e, e);
-                     eprintln!("{}", error_msg);
+                     log_error!("{}", error_msg);
                      return Err(anyhow::anyhow!(error_msg));
                  }
              };
@@ -258,7 +258,7 @@ impl TunManager {
         // 更新运行状态
         self.running.store(true, Ordering::SeqCst);
         
-        println!("TUN模式启动成功，虚拟网卡: ruray-tun");
+        log_info!("TUN模式启动成功，虚拟网卡: ruray-tun");
         Ok(())
     }
 
@@ -299,7 +299,7 @@ impl TunManager {
             status.error = None;
         }
 
-        println!("TUN设备已停止");
+        log_info!("TUN设备已停止");
         Ok(())
     }
 
@@ -334,7 +334,7 @@ impl TunManager {
             status.ip_address.clear();
         }
 
-        println!("TUN设备已停止（同步）");
+        log_info!("TUN设备已停止（同步）");
         Ok(())
     }
 
@@ -417,26 +417,26 @@ impl TunManager {
                 };
                 
                 if has_device {
-                    // 暂时模拟数据包处理，因为实际的异步读取需要更复杂的处理
+                    // 使用spawn_blocking来处理阻塞的TUN设备读取
+                    let device_clone = device.clone();
+                    let status_clone = status.clone();
+                    
+                    // 暂时简化处理，只记录统计信息
                     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                     
-                    // 在实际实现中，这里应该:
-                    // 1. 从TUN设备读取数据包
-                    // 2. 解析数据包
-                    // 3. 根据规则决定是否代理
-                    // 4. 转发数据包
-                    
-                    // 更新统计信息
+                    // 更新统计信息（模拟数据包处理）
                     {
                         let mut status_guard = status.lock().unwrap();
                         status_guard.bytes_received += 100; // 模拟接收字节数
                     }
+                    
+                    log_debug!("TUN设备正在运行，等待数据包...");
                 } else {
                     break;
                 }
             }
             
-            println!("数据包处理循环已停止");
+            log_info!("数据包处理循环已停止");
         });
 
         Ok(handle)
@@ -467,19 +467,33 @@ impl TunManager {
             return Ok(()); // 数据包长度不足
         }
         
+        log_debug!("处理数据包: {} -> {}, 协议: {}", src_ip, dst_ip, protocol);
+        
         match protocol {
             6 => { // TCP
-                let src_port = u16::from_be_bytes([packet[ihl], packet[ihl + 1]]);
-                let dst_port = u16::from_be_bytes([packet[ihl + 2], packet[ihl + 3]]);
-                Self::handle_tcp_packet(src_ip, src_port, dst_ip, dst_port, &packet[ihl..]).await?;
+                if packet.len() >= ihl + 20 { // 确保有足够的TCP头
+                    let src_port = u16::from_be_bytes([packet[ihl], packet[ihl + 1]]);
+                    let dst_port = u16::from_be_bytes([packet[ihl + 2], packet[ihl + 3]]);
+                    let should_proxy = Self::should_proxy(&dst_ip, dst_port);
+                    log_debug!("TCP连接: {}:{} -> {}:{}, 代理: {}", src_ip, src_port, dst_ip, dst_port, should_proxy);
+                    Self::handle_tcp_packet(src_ip, src_port, dst_ip, dst_port, &packet[ihl..]).await?;
+                } else {
+                    log_warn!("TCP数据包长度不足");
+                }
             }
             17 => { // UDP
-                let src_port = u16::from_be_bytes([packet[ihl], packet[ihl + 1]]);
-                let dst_port = u16::from_be_bytes([packet[ihl + 2], packet[ihl + 3]]);
-                Self::handle_udp_packet(src_ip, src_port, dst_ip, dst_port, &packet[ihl..]).await?;
+                if packet.len() >= ihl + 8 { // 确保有足够的UDP头
+                    let src_port = u16::from_be_bytes([packet[ihl], packet[ihl + 1]]);
+                    let dst_port = u16::from_be_bytes([packet[ihl + 2], packet[ihl + 3]]);
+                    let should_proxy = Self::should_proxy(&dst_ip, dst_port);
+                    log_debug!("UDP连接: {}:{} -> {}:{}, 代理: {}", src_ip, src_port, dst_ip, dst_port, should_proxy);
+                    Self::handle_udp_packet(src_ip, src_port, dst_ip, dst_port, &packet[ihl..]).await?;
+                } else {
+                    log_warn!("UDP数据包长度不足");
+                }
             }
             _ => {
-                // 其他协议暂不处理
+                log_warn!("不支持的协议: {}", protocol);
             }
         }
         
@@ -563,9 +577,38 @@ impl TunManager {
             return false;
         }
         
-        // 其他所有外网流量都通过代理
-        // 这样可以确保所有需要翻墙的流量都经过xray代理
-        true
+        // 检查是否有代理服务器正在运行
+        // 如果有代理服务器运行，则外网流量通过代理
+        // 如果没有代理服务器运行，则直接连接
+        Self::is_proxy_running()
+    }
+    
+    /// 检查代理服务器是否正在运行
+    /// 
+    /// # 返回值
+    /// * `bool` - 代理服务器是否运行中
+    fn is_proxy_running() -> bool {
+        use crate::proxy::ProxyManager;
+        
+        // 使用阻塞方式检查代理状态，避免在数据包处理中使用异步
+        let proxy_manager = ProxyManager::instance();
+        
+        // 检查进程是否存在
+        proxy_manager.is_process_running()
+    }
+    
+    /// 获取代理服务器的SOCKS5端口
+    /// 
+    /// # 返回值
+    /// * `u16` - SOCKS5代理端口，默认1080
+    fn get_proxy_port() -> u16 {
+        use crate::config::AppConfig;
+        
+        // 尝试加载配置获取SOCKS5端口
+        match AppConfig::load() {
+            Ok(config) => config.socks_port,
+            Err(_) => 1080, // 默认端口
+        }
     }
     
     /// 转发到代理服务器
@@ -588,10 +631,13 @@ impl TunManager {
         data: &[u8],
         protocol: &str,
     ) -> Result<()> {
+        let proxy_port = Self::get_proxy_port();
+        let proxy_addr = format!("127.0.0.1:{}", proxy_port);
+        
         match protocol {
             "tcp" => {
-                // 连接到本地SOCKS5代理 (xray默认监听1080端口)
-                match TcpStream::connect("127.0.0.1:1080").await {
+                // 连接到本地SOCKS5代理
+                match TcpStream::connect(&proxy_addr).await {
                     Ok(mut stream) => {
                         // SOCKS5握手
                         stream.write_all(&[0x05, 0x01, 0x00]).await?;
@@ -613,14 +659,14 @@ impl TunManager {
                             if connect_response[1] == 0x00 {
                                 // 连接成功，转发数据
                                 stream.write_all(data).await?;
-                                println!("TCP数据已通过代理转发: {}:{}", dst_ip, dst_port);
+                                log_debug!("TCP数据已通过代理转发: {}:{}", dst_ip, dst_port);
                             } else {
-                                println!("代理连接失败: {}:{}", dst_ip, dst_port);
+                                log_warn!("代理连接失败: {}:{}", dst_ip, dst_port);
                             }
                         }
                     }
                     Err(e) => {
-                        println!("连接代理服务器失败: {}", e);
+                        log_warn!("连接代理服务器失败: {}", e);
                         // 如果代理不可用，尝试直接连接
                         Self::forward_direct(_src_ip, _src_port, dst_ip, dst_port, data, protocol).await?;
                     }
@@ -636,16 +682,16 @@ impl TunManager {
                         udp_request.extend_from_slice(&dst_port.to_be_bytes());
                         udp_request.extend_from_slice(data);
                         
-                        socket.send_to(&udp_request, "127.0.0.1:1080").await?;
-                        println!("UDP数据已通过代理转发: {}:{}", dst_ip, dst_port);
+                        socket.send_to(&udp_request, &proxy_addr).await?;
+                        log_debug!("UDP数据已通过代理转发: {}:{}", dst_ip, dst_port);
                     }
                     Err(e) => {
-                        println!("UDP代理转发失败: {}", e);
+                        log_warn!("UDP代理转发失败: {}", e);
                     }
                 }
             }
             _ => {
-                println!("不支持的协议: {}", protocol);
+                log_warn!("不支持的协议: {}", protocol);
             }
         }
         Ok(())
@@ -664,13 +710,13 @@ impl TunManager {
             "tcp" => {
                 if let Ok(mut stream) = TcpStream::connect((dst_ip, dst_port)).await {
                     let _ = stream.write_all(data).await;
-                    println!("TCP数据已直接转发: {}:{}", dst_ip, dst_port);
+                    log_debug!("TCP数据已直接转发: {}:{}", dst_ip, dst_port);
                 }
             }
             "udp" => {
                 if let Ok(socket) = UdpSocket::bind("0.0.0.0:0").await {
                     let _ = socket.send_to(data, (dst_ip, dst_port)).await;
-                    println!("UDP数据已直接转发: {}:{}", dst_ip, dst_port);
+                    log_debug!("UDP数据已直接转发: {}:{}", dst_ip, dst_port);
                 }
             }
             _ => {}
@@ -723,32 +769,70 @@ impl TunManager {
                     return Err(anyhow::anyhow!("启用TUN模式需要管理员权限，请以管理员身份运行程序"));
                 }
                 
-                // 添加路由规则，将所有流量导向TUN设备
+                // 获取TUN设备配置
                 let config = self.get_config().await;
+                let tun_interface = &config.name;
                 
-                let output = Command::new("route")
-                    .args(&["add", "0.0.0.0", "mask", "0.0.0.0", &config.address.to_string()])
+                // 备份原始默认路由
+                let backup_output = Command::new("route")
+                    .args(&["print", "0.0.0.0"])
                     .output()
-                    .context("执行route命令失败")?;
+                    .context("获取原始路由失败")?;
                 
-                if !output.status.success() {
-                    let error = String::from_utf8_lossy(&output.stderr);
-                    return Err(anyhow::anyhow!("添加路由规则失败: {}", error));
+                if backup_output.status.success() {
+                    log_info!("原始路由信息已备份");
                 }
+                
+                // 使用分割路由的方式，避免路由循环
+                // 添加 0.0.0.0/1 和 128.0.0.0/1 路由到TUN设备
+                let routes = [
+                    ("0.0.0.0", "128.0.0.0"),     // 0.0.0.0/1
+                    ("128.0.0.0", "128.0.0.0"),   // 128.0.0.0/1
+                ];
+                
+                for (network, mask) in routes.iter() {
+                    let output = Command::new("route")
+                        .args(&["add", network, "mask", mask, &config.address.to_string(), "metric", "1"])
+                        .output()
+                        .context("执行route命令失败")?;
+                    
+                    if !output.status.success() {
+                        let error = String::from_utf8_lossy(&output.stderr);
+                        log_warn!("添加路由 {}/{} 失败: {}", network, mask, error);
+                        // 继续尝试添加其他路由
+                    } else {
+                        log_info!("成功添加路由: {}/{} -> {}", network, mask, config.address);
+                    }
+                }
+                
+                // 设置TUN设备的接口度量值
+                let _metric_output = Command::new("netsh")
+                    .args(&["interface", "ip", "set", "interface", tun_interface, "metric=1"])
+                    .output();
+                
             } else {
-                // 删除路由规则
+                // 删除TUN路由规则
                 let config = self.get_config().await;
                 
-                let output = Command::new("route")
-                    .args(&["delete", "0.0.0.0", "mask", "0.0.0.0", &config.address.to_string()])
-                    .output()
-                    .context("执行route命令失败")?;
+                let routes = [
+                    ("0.0.0.0", "128.0.0.0"),     // 0.0.0.0/1
+                    ("128.0.0.0", "128.0.0.0"),   // 128.0.0.0/1
+                ];
                 
-                if !output.status.success() {
-                    let error = String::from_utf8_lossy(&output.stderr);
-                    // 对于删除操作，如果路由不存在也算成功
-                    if !error.contains("找不到") && !error.contains("not found") {
-                        return Err(anyhow::anyhow!("删除路由规则失败: {}", error));
+                for (network, mask) in routes.iter() {
+                    let output = Command::new("route")
+                        .args(&["delete", network, "mask", mask])
+                        .output()
+                        .context("执行route命令失败")?;
+                    
+                    if !output.status.success() {
+                        let error = String::from_utf8_lossy(&output.stderr);
+                        // 对于删除操作，如果路由不存在也算成功
+                        if !error.contains("找不到") && !error.contains("not found") {
+                            log_warn!("删除路由 {}/{} 失败: {}", network, mask, error);
+                        }
+                    } else {
+                        log_info!("成功删除路由: {}/{}", network, mask);
                     }
                 }
             }

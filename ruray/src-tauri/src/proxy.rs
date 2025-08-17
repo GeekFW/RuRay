@@ -14,6 +14,9 @@ use tokio::time::Duration;
 use tokio::process::Command as TokioCommand;
 use sysinfo::System;
 
+// 导入日志宏
+use crate::{log_debug, log_info, log_warn, log_error};
+
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
@@ -42,6 +45,15 @@ impl ProxyManager {
             }
         })
     }
+    
+    /// 检查代理进程是否正在运行（同步方法）
+    /// 
+    /// # 返回值
+    /// * `bool` - 代理进程是否运行中
+    pub fn is_process_running(&self) -> bool {
+        let process_guard = self.process.lock().unwrap();
+        process_guard.is_some()
+    }
 
     /// 启动代理
     /// 确保同时只有一个 Xray 进程运行，切换时先停止上一个进程再启动新的进程
@@ -55,11 +67,11 @@ impl ProxyManager {
             // 启动TUN模式
             let tun_manager = TunManager::instance();
             if let Err(e) = tun_manager.start(config.tun_config.clone()).await {
-                eprintln!("启动TUN模式失败: {}", e);
-                // TUN模式启动失败时，禁用TUN模式并保存配置
-                config.tun_enabled = false;
-                if let Err(save_err) = config.save() {
-                    eprintln!("保存配置失败: {}", save_err);
+                log_error!("启动TUN模式失败: {}", e);
+                 // TUN模式启动失败时，禁用TUN模式并保存配置
+                 config.tun_enabled = false;
+                 if let Err(save_err) = config.save() {
+                     log_error!("保存配置失败: {}", save_err);
                 }
                 // 继续使用传统代理模式
             }
@@ -128,7 +140,7 @@ impl ProxyManager {
                 }
             }
         }
-
+        log_info!("Xray Core 启动成功");
         Ok(())
     }
 
@@ -139,7 +151,7 @@ impl ProxyManager {
         let tun_manager = TunManager::instance();
         if tun_manager.is_running().await {
             if let Err(e) = tun_manager.stop().await {
-                eprintln!("停止TUN模式失败: {}", e);
+                log_error!("停止TUN模式失败: {}", e);
             }
         }
         // 获取进程信息并立即释放锁
@@ -189,6 +201,7 @@ impl ProxyManager {
             *current_server = None;
         }
 
+        log_info!("Xray Core 已停止");
         Ok(())
     }
 

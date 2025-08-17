@@ -70,6 +70,20 @@ fn default_auth_method() -> String {
     "noauth".to_string()
 }
 
+/// 为 log_path 字段提供默认值
+fn default_log_path() -> String {
+    // 默认日志路径为配置目录下的 log/ruray.log
+    match dirs::config_dir() {
+        Some(config_dir) => config_dir
+            .join("RuRay")
+            .join("log")
+            .join("ruray.log")
+            .to_string_lossy()
+            .to_string(),
+        None => "./log/ruray.log".to_string(),
+    }
+}
+
 /// 应用配置结构体
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -86,6 +100,9 @@ pub struct AppConfig {
     pub theme_color: String,
     pub language: String,
     pub log_level: String,
+    /// 日志文件路径配置
+    #[serde(default = "default_log_path")]
+    pub log_path: String,
     pub http_port: u16,
     pub socks_port: u16,
     pub pac_port: u16,
@@ -145,6 +162,7 @@ impl Default for AppConfig {
             theme_color: "green".to_string(),
             language: "zh-CN".to_string(),
             log_level: "info".to_string(),
+            log_path: default_log_path(),
             http_port: 10086,
             socks_port: 10087,
             pac_port: 8090,
