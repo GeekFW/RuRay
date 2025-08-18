@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![RuRay Logo](ruray/public/tauri.svg)
+![RuRay Logo](src-tauri/icons/icon.png)
 
 **一个现代化的跨平台代理管理应用程序**
 
