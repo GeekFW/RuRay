@@ -123,7 +123,7 @@
               :loading="server.activating"
               :title="getActivationButtonTitle(server.id)"
             >
-              <Icon :name="getActivationButtonIcon(server.id)" class="w-4 h-4" />
+              <Icon v-if="!server.activating" :name="getActivationButtonIcon(server.id)" class="w-4 h-4" />
             </UButton>
             
             <!-- 测试连接 -->

@@ -11,7 +11,7 @@
       <!-- 主内容区域 -->
       <div class="flex-1 flex overflow-hidden">
         <!-- 左侧服务器列表 -->
-        <ServerList class="w-80 border-r border-gray-200 dark:border-gray-700" />
+        <ServerList class="w-100 border-r border-gray-200 dark:border-gray-700" />
         
         <!-- 右侧日志区域 -->
         <LogViewer class="flex-1" />
