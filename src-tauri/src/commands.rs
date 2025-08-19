@@ -182,6 +182,27 @@ pub async fn update_tun_config(config: TunConfig) -> Result<(), String> {
     tun_manager.update_config(config).await.map_err(|e| e.to_string())
 }
 
+/// 保存TUN配置到文件
+/// 
+/// # 参数
+/// * `config` - 要保存的TUN配置
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 保存结果
+#[tauri::command]
+pub async fn save_tun_config(config: TunConfig) -> Result<(), String> {
+    // 更新TUN管理器中的配置
+    let tun_manager = TunManager::instance();
+    tun_manager.update_config(config.clone()).await.map_err(|e| e.to_string())?;
+    
+    // 保存到应用配置文件
+    let mut app_config = AppConfig::load().map_err(|e| e.to_string())?;
+    app_config.tun_config = config;
+    app_config.save().map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
 /// 设置系统路由（启用/禁用TUN模式路由）
 /// 
 /// # 参数

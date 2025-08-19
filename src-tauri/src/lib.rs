@@ -333,6 +333,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::is_tun_running,
             commands::get_tun_config,
             commands::update_tun_config,
+            commands::save_tun_config,
             commands::set_tun_system_route,
             commands::toggle_tun_mode,
         ])

@@ -361,6 +361,11 @@
                   </div>
                 </div>
               </div>
+
+              <!-- TUN配置 Tab -->
+              <div v-show="activeSettingsTab === 3" class="space-y-6">
+                <TunConfig />
+              </div>
             </div>
           </div>
 
@@ -496,7 +501,8 @@ const domainPresetOptions = [
 const settingsTabOptions = [
   { label: '基础设置', value: 0 },
   { label: '路由设置', value: 1 },
-  { label: 'Core设置', value: 2 }
+  { label: 'Core设置', value: 2 },
+  { label: 'TUN配置', value: 3 }
 ]
 
 // 计算属性：处理颜色模式选项的双向绑定
