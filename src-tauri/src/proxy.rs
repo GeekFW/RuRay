@@ -322,6 +322,22 @@ impl ProxyManager {
         Ok(())
     }
 
+    /// 获取当前代理服务器的地址信息
+    /// 返回 (socks_url, http_url) 如果代理正在运行
+    pub fn get_proxy_urls(&self) -> Result<Option<(String, String)>> {
+        let config = AppConfig::load()?;
+        
+        // 检查代理是否正在运行
+        if !self.is_process_running() {
+            return Ok(None);
+        }
+        
+        let socks_url = format!("socks5://127.0.0.1:{}", config.socks_port);
+        let http_url = format!("http://127.0.0.1:{}", config.http_port);
+        
+        Ok(Some((socks_url, http_url)))
+    }
+    
     /// 获取代理状态
     pub async fn get_status(&self) -> Result<ProxyStatus> {
         let config = AppConfig::load()?;

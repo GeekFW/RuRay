@@ -211,9 +211,10 @@ pub async fn save_tun_config(config: TunConfig) -> Result<(), String> {
 /// # 返回值
 /// * `Result<(), String>` - 设置结果
 #[tauri::command]
-pub async fn set_tun_system_route(enable: bool) -> Result<(), String> {
-    let tun_manager = TunManager::instance();
-    tun_manager.set_system_route(enable).await.map_err(|e| e.to_string())
+pub async fn set_tun_system_route(_enable: bool) -> Result<(), String> {
+    // 注意：使用tun2proxy时，系统路由由tun2proxy自动管理
+    // 这个函数保留用于兼容性，但实际上不执行任何操作
+    Ok(())
 }
 
 /// 切换TUN模式开关
@@ -241,16 +242,10 @@ pub async fn toggle_tun_mode(enabled: bool) -> Result<(), String> {
             reset_config.save().map_err(|e| e.to_string())?;
             return Err(e.to_string());
         }
-        if let Err(e) = tun_manager.set_system_route(true).await {
-            // 设置系统路由失败时，重置配置并保存
-            let mut reset_config = AppConfig::load().map_err(|e| e.to_string())?;
-            reset_config.tun_enabled = false;
-            reset_config.save().map_err(|e| e.to_string())?;
-            return Err(e.to_string());
-        }
+        // 注意：使用tun2proxy时，系统路由由tun2proxy自动管理
     } else {
         // 禁用TUN模式
-        tun_manager.set_system_route(false).await.map_err(|e| e.to_string())?;
+        // 注意：使用tun2proxy时，系统路由由tun2proxy自动管理
         tun_manager.stop().await.map_err(|e| e.to_string())?;
     }
     

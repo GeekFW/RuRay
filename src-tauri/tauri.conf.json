@@ -41,7 +41,8 @@
       "wintun/bin/amd64/wintun.dll",
       "wintun/bin/x86/wintun.dll",
       "wintun/bin/arm64/wintun.dll",
-      "wintun/bin/arm/wintun.dll"
+      "wintun/bin/arm/wintun.dll",
+      "tun2proxy/*"
     ]
   },
   "plugins": {}
