@@ -278,6 +278,22 @@ impl TunManager {
         Ok(tun2proxy_path)
     }
 
+    /// 获取当前激活服务器的地址
+    /// 
+    /// # Returns
+    /// 
+    /// * `Result<String>` - 返回服务器地址，如果获取失败则返回错误
+    async fn get_current_server_address(&self) -> Result<String> {
+        let proxy_manager = ProxyManager::instance();
+        
+        // 通过ProxyManager的公共方法获取当前服务器地址
+        if let Some(address) = proxy_manager.get_current_server_address()? {
+            Ok(address)
+        } else {
+            Err(anyhow::anyhow!("未找到当前激活的服务器"))
+        }
+    }
+
     /// 启动TUN设备
     /// 
     /// # 参数
@@ -325,13 +341,21 @@ impl TunManager {
         
         log_info!("启动tun2proxy: {}", tun2proxy_path.display());
         
+        // 获取当前激活服务器的地址信息
+        let server_address = self.get_current_server_address().await
+            .context("获取当前服务器地址失败")?;
+        
         // 构建tun2proxy命令参数
         let mut cmd = Command::new(&tun2proxy_path);
         cmd.arg("--setup")  // 启动程序
+            .arg("--dns")   // 设置DNS处理方式
+            .arg("over-tcp") // 使用TCP方式处理DNS
             .arg("--tun")   // 指定TUN网卡名称
             .arg(&config.name)
             .arg("--proxy") // 指定代理服务器
             .arg(&proxy_url)
+            .arg("--bypass") // 绕过代理的地址
+            .arg(&server_address) // 当前激活服务器的IP地址
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         

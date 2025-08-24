@@ -338,6 +338,30 @@ impl ProxyManager {
         Ok(Some((socks_url, http_url)))
     }
     
+    /// 获取当前激活服务器的地址
+    /// 
+    /// # Returns
+    /// 
+    /// * `Result<Option<String>>` - 返回服务器地址，如果没有激活服务器则返回None
+    pub fn get_current_server_address(&self) -> Result<Option<String>> {
+        let config = AppConfig::load()?;
+        
+        // 获取当前激活的服务器ID
+        let current_server_id = {
+            let current_server = self.current_server.lock().unwrap();
+            current_server.clone()
+        };
+        
+        if let Some(server_id) = current_server_id {
+            // 根据服务器ID查找服务器配置
+            if let Some(server) = config.servers.iter().find(|s| s.id == server_id) {
+                return Ok(Some(server.address.clone()));
+            }
+        }
+        
+        Ok(None)
+    }
+    
     /// 获取代理状态
     pub async fn get_status(&self) -> Result<ProxyStatus> {
         let config = AppConfig::load()?;
