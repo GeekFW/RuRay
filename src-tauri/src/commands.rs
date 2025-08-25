@@ -10,6 +10,7 @@ use tauri::Emitter;
 use uuid::Uuid;
 
 use crate::config::AppConfig;
+use crate::network::NetworkSpeedStats;
 use crate::proxy::ProxyManager;
 use crate::system::SystemManager;
 use crate::tun::{TunConfig, TunManager, TunStatus};
@@ -308,36 +309,16 @@ pub async fn start_proxy(server_id: String) -> Result<(), String> {
         proxy_manager.start(server).await.map_err(|e| e.to_string())?;
         
         // 自动配置系统代理
-        let system_manager = SystemManager::new();
+        let system_manager = SystemManager::instance();
         
-        // 根据代理模式设置系统代理
-        match config.proxy_mode.as_str() {
-            "global" => {
-                // 全局模式：使用 SOCKS 代理
-                let socks_proxy = format!("socks5://127.0.0.1:{}", config.socks_port);
-                system_manager.set_proxy(&socks_proxy).await.map_err(|e| {
-                    format!("设置系统代理失败: {}", e)
-                })?;
-            },
-            "pac" => {
-                // PAC 模式：使用 HTTP 代理
-                let http_proxy = format!("127.0.0.1:{}", config.http_port);
-                system_manager.set_proxy(&http_proxy).await.map_err(|e| {
-                    format!("设置系统代理失败: {}", e)
-                })?;
-            },
-            "direct" => {
-                // 直连模式：不设置系统代理
-                // 仅启动代理服务，不修改系统设置
-            },
-            _ => {
-                // 默认使用 HTTP 代理
-                let http_proxy = format!("127.0.0.1:{}", config.http_port);
-                system_manager.set_proxy(&http_proxy).await.map_err(|e| {
-                    format!("设置系统代理失败: {}", e)
-                })?;
-            }
-        }
+        // 根据代理模式设置系统代理，同时启用HTTP和SOCKS5
+        system_manager.set_proxy_with_mode(
+            &config.proxy_mode, 
+            config.http_port, 
+            config.socks_port
+        ).await.map_err(|e| {
+            format!("设置系统代理失败: {}", e)
+        })?;
         
         Ok(())
     } else {
@@ -354,11 +335,17 @@ pub async fn stop_proxy() -> Result<(), String> {
     // 停止代理服务
     proxy_manager.stop().await.map_err(|e| e.to_string())?;
     
-    // 自动清除系统代理设置
-    let system_manager = SystemManager::new();
-    system_manager.unset_proxy().await.map_err(|e| {
-        format!("清除系统代理失败: {}", e)
-    })?;
+    // 根据代理模式决定是否清除系统代理设置
+    let config = AppConfig::load().map_err(|e| e.to_string())?;
+    
+    // 只有在全局代理或PAC模式下才需要清除系统代理
+    // 直连模式下本来就没有设置系统代理，无需清除
+    if config.proxy_mode == "global" || config.proxy_mode == "pac" {
+        let system_manager = SystemManager::instance();
+        system_manager.unset_proxy().await.map_err(|e| {
+            format!("清除系统代理失败: {}", e)
+        })?;
+    }
     
     Ok(())
 }
@@ -382,14 +369,14 @@ pub async fn set_proxy_mode(mode: String) -> Result<(), String> {
 /// 获取系统统计信息
 #[tauri::command]
 pub async fn get_system_stats() -> Result<SystemStats, String> {
-    let system_manager = SystemManager::new();
+    let system_manager = SystemManager::instance();
     system_manager.get_stats().await.map_err(|e| e.to_string())
 }
 
 /// 设置系统代理
 #[tauri::command]
 pub async fn set_system_proxy(proxy_url: String) -> Result<(), String> {
-    let system_manager = SystemManager::new();
+    let system_manager = SystemManager::instance();
     system_manager.set_proxy(&proxy_url).await.map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -397,7 +384,7 @@ pub async fn set_system_proxy(proxy_url: String) -> Result<(), String> {
 /// 清除系统代理
 #[tauri::command]
 pub async fn clear_system_proxy() -> Result<(), String> {
-    let system_manager = SystemManager::new();
+    let system_manager = SystemManager::instance();
     system_manager.unset_proxy().await.map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -405,7 +392,7 @@ pub async fn clear_system_proxy() -> Result<(), String> {
 /// 获取系统代理状态
 #[tauri::command]
 pub async fn get_system_proxy_status() -> Result<serde_json::Value, String> {
-    let system_manager = SystemManager::new();
+    let system_manager = SystemManager::instance();
     system_manager.get_proxy_status().await.map_err(|e| e.to_string())
 }
 
@@ -597,6 +584,43 @@ pub async fn test_xray_config(server_id: String) -> Result<String, String> {
     } else {
         Err(format!("服务器不存在: {}", server_id))
     }
+}
+
+/// 获取网络速度统计
+/// 返回当前的上传下载速度和总流量统计
+#[tauri::command]
+pub async fn get_network_speed() -> Result<NetworkSpeedStats, String> {
+    // 确保网络统计监控已启动
+    let manager = crate::network::NetworkStatsManager::instance();
+    
+    // 检查监控是否已启动，如果没有则启动
+    let need_start = {
+        match manager.stats_task.lock() {
+            Ok(task_guard) => task_guard.is_none(),
+            Err(_) => true, // 如果锁失败，假设需要启动
+        }
+    };
+    
+    if need_start {
+        println!("[DEBUG] 网络统计监控未启动，正在自动启动...");
+        if let Err(e) = manager.start_monitoring().await {
+            eprintln!("[ERROR] 自动启动网络统计监控失败: {}", e);
+            return Err(format!("启动网络统计监控失败: {}", e));
+        } else {
+            println!("[DEBUG] 网络统计监控自动启动成功");
+        }
+    }
+    
+    Ok(manager.get_current_speed())
+}
+
+/// 重置网络统计
+/// 重置总流量统计，从当前时刻开始重新计算
+#[tauri::command]
+pub async fn reset_network_stats() -> Result<(), String> {
+    crate::network::reset_network_stats()
+        .await
+        .map_err(|e| format!("重置网络统计失败: {}", e))
 }
 
 /// 获取应用配置

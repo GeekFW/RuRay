@@ -21,10 +21,16 @@ use crate::proxy::ProxyManager;
 use std::os::windows::ffi::OsStrExt;
 
 #[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
 use windows_sys::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 /// 为 gateway 字段提供默认值
 fn default_gateway() -> IpAddr {
@@ -358,6 +364,12 @@ impl TunManager {
             .arg(&server_address) // 当前激活服务器的IP地址
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        
+        // Windows平台下隐藏命令行窗口
+        #[cfg(target_os = "windows")]
+        {
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
         
         // 如果启用了严格路由模式，添加相应参数
         if config.strict_route {

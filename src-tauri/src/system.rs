@@ -5,6 +5,8 @@
  */
 
 use anyhow::{Context, Result};
+use std::sync::{Arc, Mutex, OnceLock};
+use tauri::{AppHandle, Manager, path::BaseDirectory};
 
 use sysinfo::{System, Networks};
 
@@ -14,15 +16,27 @@ use crate::commands::SystemStats;
 pub struct SystemManager {
     system: std::sync::Mutex<System>,
     networks: std::sync::Mutex<Networks>,
+    app_handle: Arc<Mutex<Option<AppHandle>>>,
 }
 
+// 全局单例实例
+static SYSTEM_MANAGER: OnceLock<SystemManager> = OnceLock::new();
+
 impl SystemManager {
-    /// 创建新的系统管理器实例
-    pub fn new() -> Self {
-        Self {
-            system: std::sync::Mutex::new(System::new_all()),
-            networks: std::sync::Mutex::new(Networks::new_with_refreshed_list()),
-        }
+    /// 获取全局系统管理器实例（单例模式）
+    pub fn instance() -> &'static SystemManager {
+        SYSTEM_MANAGER.get_or_init(|| {
+            Self {
+                system: std::sync::Mutex::new(System::new_all()),
+                networks: std::sync::Mutex::new(Networks::new_with_refreshed_list()),
+                app_handle: Arc::new(Mutex::new(None)),
+            }
+        })
+    }
+
+    /// 设置应用句柄
+    pub fn set_app_handle(&self, handle: AppHandle) {
+        *self.app_handle.lock().unwrap() = Some(handle);
     }
 
     /// 获取系统统计信息
@@ -80,6 +94,65 @@ impl SystemManager {
         #[cfg(target_os = "linux")]
         {
             self.set_linux_proxy(proxy_url).await
+        }
+    }
+
+    /// 根据代理模式设置系统代理
+    /// 
+    /// # 参数
+    /// * `proxy_mode` - 代理模式："global"、"pac"、"direct"
+    /// * `http_port` - HTTP代理端口
+    /// * `socks_port` - SOCKS5代理端口
+    pub async fn set_proxy_with_mode(&self, proxy_mode: &str, http_port: u16, socks_port: u16) -> Result<()> {
+        #[cfg(target_os = "windows")]
+        {
+            self.set_windows_proxy_with_mode(proxy_mode, http_port, socks_port).await
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            // macOS暂时使用原有逻辑
+            match proxy_mode {
+                "global" => {
+                    let socks_proxy = format!("socks5://127.0.0.1:{}", socks_port);
+                    self.set_macos_proxy(&socks_proxy).await
+                },
+                "pac" => {
+                    let http_proxy = format!("http://127.0.0.1:{}", http_port);
+                    self.set_macos_proxy(&http_proxy).await
+                },
+                "direct" => {
+                    // 直连模式不设置代理
+                    Ok(())
+                },
+                _ => {
+                    let http_proxy = format!("http://127.0.0.1:{}", http_port);
+                    self.set_macos_proxy(&http_proxy).await
+                }
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // Linux暂时使用原有逻辑
+            match proxy_mode {
+                "global" => {
+                    let socks_proxy = format!("socks5://127.0.0.1:{}", socks_port);
+                    self.set_linux_proxy(&socks_proxy).await
+                },
+                "pac" => {
+                    let http_proxy = format!("http://127.0.0.1:{}", http_port);
+                    self.set_linux_proxy(&http_proxy).await
+                },
+                "direct" => {
+                    // 直连模式不设置代理
+                    Ok(())
+                },
+                _ => {
+                    let http_proxy = format!("http://127.0.0.1:{}", http_port);
+                    self.set_linux_proxy(&http_proxy).await
+                }
+            }
         }
     }
 
@@ -176,6 +249,198 @@ impl SystemManager {
         Ok(())
     }
 
+    /// Windows平台根据代理模式设置系统代理
+    /// 
+    /// # 参数
+    /// * `proxy_mode` - 代理模式："global"、"pac"、"direct"
+    /// * `http_port` - HTTP代理端口
+    /// * `socks_port` - SOCKS5代理端口
+    #[cfg(target_os = "windows")]
+    async fn set_windows_proxy_with_mode(&self, proxy_mode: &str, http_port: u16, socks_port: u16) -> Result<()> {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let internet_settings = hkcu
+            .open_subkey_with_flags("Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings", KEY_WRITE)
+            .context("无法打开注册表项")?;
+
+        match proxy_mode {
+            "global" => {
+                // 全局模式：设置HTTP和SOCKS5代理
+                let proxy_server = format!("http=127.0.0.1:{};https=127.0.0.1:{};socks=127.0.0.1:{}", 
+                                          http_port, http_port, socks_port);
+                
+                // 启用代理
+                internet_settings
+                    .set_value("ProxyEnable", &1u32)
+                    .context("无法设置 ProxyEnable")?;
+
+                // 设置代理服务器
+                internet_settings
+                    .set_value("ProxyServer", &proxy_server)
+                    .context("无法设置 ProxyServer")?;
+
+                // 设置代理覆盖（本地地址不使用代理）
+                let proxy_override = "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;*.local;<local>";
+                internet_settings
+                    .set_value("ProxyOverride", &proxy_override)
+                    .context("无法设置 ProxyOverride")?;
+
+                // 关闭自动检测和PAC脚本
+                internet_settings
+                    .set_value("AutoDetect", &0u32)
+                    .context("无法设置 AutoDetect")?;
+                internet_settings
+                    .set_value("AutoConfigURL", &"")
+                    .context("无法设置 AutoConfigURL")?;
+            },
+            "pac" => {
+                // PAC模式：设置自动配置脚本和代理服务器
+                let pac_file_path = std::env::current_exe()
+                    .context("无法获取当前执行文件路径")?
+                    .parent()
+                    .context("无法获取父目录")?
+                    .join("runtime.pac");
+                
+                // 生成动态PAC文件
+                self.generate_pac_file(&pac_file_path, http_port, socks_port).await?;
+                
+                let pac_url = format!("file:///{}", pac_file_path.to_string_lossy().replace("\\", "/"));
+                
+                // PAC模式需要同时设置代理服务器和PAC脚本
+                // 设置代理服务器（PAC脚本会引用这些代理）
+                let proxy_server = format!("http=127.0.0.1:{};https=127.0.0.1:{};socks=127.0.0.1:{}", 
+                                          http_port, http_port, socks_port);
+                
+                // 启用代理
+                internet_settings
+                    .set_value("ProxyEnable", &1u32)
+                    .context("无法设置 ProxyEnable")?;
+                
+                // 设置代理服务器
+                internet_settings
+                    .set_value("ProxyServer", &proxy_server)
+                    .context("无法设置 ProxyServer")?;
+                
+                // 设置PAC脚本URL
+                internet_settings
+                    .set_value("AutoConfigURL", &pac_url)
+                    .context("无法设置 AutoConfigURL")?;
+                
+                // 关闭自动检测
+                internet_settings
+                    .set_value("AutoDetect", &0u32)
+                    .context("无法设置 AutoDetect")?;
+                
+                // 设置代理覆盖（本地地址不使用代理）
+                let proxy_override = "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;*.local;<local>";
+                internet_settings
+                    .set_value("ProxyOverride", &proxy_override)
+                    .context("无法设置 ProxyOverride")?;
+            },
+            "direct" => {
+                // 直连模式：清除所有代理设置
+                // 禁用代理
+                internet_settings
+                    .set_value("ProxyEnable", &0u32)
+                    .context("无法禁用代理")?;
+                
+                // 清除代理服务器设置
+                internet_settings
+                    .set_value("ProxyServer", &"")
+                    .context("无法清除代理服务器")?;
+                
+                // 清除PAC脚本URL
+                internet_settings
+                    .set_value("AutoConfigURL", &"")
+                    .context("无法清除PAC脚本URL")?;
+                
+                // 关闭自动检测
+                internet_settings
+                    .set_value("AutoDetect", &0u32)
+                    .context("无法关闭自动检测")?;
+                
+                // 清除代理覆盖设置
+                internet_settings
+                    .set_value("ProxyOverride", &"")
+                    .context("无法清除代理覆盖设置")?;
+            },
+            _ => {
+                // 默认模式：同时设置HTTP和SOCKS5代理
+                let proxy_server = format!("http=127.0.0.1:{};https=127.0.0.1:{};socks=127.0.0.1:{}", 
+                                          http_port, http_port, socks_port);
+                
+                // 启用代理
+                internet_settings
+                    .set_value("ProxyEnable", &1u32)
+                    .context("无法设置 ProxyEnable")?;
+
+                // 设置代理服务器
+                internet_settings
+                    .set_value("ProxyServer", &proxy_server)
+                    .context("无法设置 ProxyServer")?;
+
+                // 设置代理覆盖（本地地址不使用代理）
+                let proxy_override = "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;*.local;<local>";
+                internet_settings
+                    .set_value("ProxyOverride", &proxy_override)
+                    .context("无法设置 ProxyOverride")?;
+
+                // 关闭自动检测和PAC脚本
+                internet_settings
+                    .set_value("AutoDetect", &0u32)
+                    .context("无法设置 AutoDetect")?;
+                internet_settings
+                    .set_value("AutoConfigURL", &"")
+                    .context("无法设置 AutoConfigURL")?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 生成动态PAC文件
+    #[cfg(target_os = "windows")]
+    async fn generate_pac_file(&self, pac_file_path: &std::path::Path, http_port: u16, socks_port: u16) -> Result<()> {
+        use std::fs;
+        
+        let app_handle_guard = self.app_handle.lock().unwrap();
+        let app_handle = app_handle_guard.as_ref()
+            .context("应用句柄未设置，请先调用 set_app_handle")?;
+        
+        // 使用Tauri的路径解析API获取资源文件路径
+        let default_pac_resource_path = "default.pac";
+        
+        let pac_template = match (*app_handle).path().resolve(default_pac_resource_path, BaseDirectory::Resource) {
+            Ok(pac_path) => {
+                if pac_path.exists() {
+                    fs::read_to_string(&pac_path)
+                        .context("无法读取默认PAC文件")?  
+                } else {
+                    return Err(anyhow::anyhow!("PAC模板文件不存在: {:?}", pac_path));
+                }
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!("无法解析PAC模板文件路径: {}", e));
+            }
+        };
+        
+        // 替换代理配置
+        let pac_content = pac_template
+            .replace(
+                "var proxy = \"SOCKS 127.0.0.1:1080\";",
+                &format!("var proxy = \"PROXY 127.0.0.1:{}; SOCKS 127.0.0.1:{}\";", http_port, socks_port)
+            );
+        
+        // 写入运行时PAC文件
+        fs::write(pac_file_path, pac_content)
+            .context("无法写入运行时PAC文件")?;
+        
+        Ok(())
+    }
+
     #[cfg(target_os = "windows")]
     async fn unset_windows_proxy(&self) -> Result<()> {
         use winreg::enums::*;
@@ -190,6 +455,21 @@ impl SystemManager {
         internet_settings
             .set_value("ProxyEnable", &0u32)
             .context("无法设置 ProxyEnable")?;
+
+        // 清除代理服务器设置
+        internet_settings
+            .set_value("ProxyServer", &"")
+            .context("无法清除 ProxyServer")?;
+
+        // 清除PAC脚本设置
+        internet_settings
+            .set_value("AutoConfigURL", &"")
+            .context("无法清除 AutoConfigURL")?;
+
+        // 关闭自动检测
+        internet_settings
+            .set_value("AutoDetect", &0u32)
+            .context("无法设置 AutoDetect")?;
 
         // 刷新系统设置
         self.refresh_windows_proxy_settings().await?;

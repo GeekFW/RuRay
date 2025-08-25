@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "RuRay",
-  "version": "0.1.0",
+  "version": "1.0.5",
   "identifier": "com.lander.ruray",
   "build": {
     "beforeBuildCommand": "pnpm generate",
@@ -42,7 +42,8 @@
       "wintun/bin/x86/wintun.dll",
       "wintun/bin/arm64/wintun.dll",
       "wintun/bin/arm/wintun.dll",
-      "tun2proxy/*"
+      "tun2proxy/*",
+      "default.pac"
     ]
   },
   "plugins": {}

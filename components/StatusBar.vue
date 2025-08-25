@@ -10,6 +10,14 @@
         </span>
       </div>
       
+      <!-- 代理模式 -->
+      <div class="flex items-center space-x-2">
+        <Icon name="heroicons:globe-alt" class="w-3 h-3 text-gray-500" />
+        <span class="text-gray-600 dark:text-gray-400 select-none">
+          {{ proxyModeText }}
+        </span>
+      </div>
+      
       <!-- 当前服务器 -->
       <div v-if="currentServer" class="flex items-center space-x-2">
         <Icon name="heroicons:server" class="w-3 h-3 text-gray-500" />
@@ -100,10 +108,17 @@ interface Server {
 interface SystemStats {
   cpu_usage: number
   memory_usage: number
-  memory_total: number
   memory_used: number
   network_upload: number
   network_download: number
+}
+
+// 网络速度统计接口
+interface NetworkSpeedStats {
+  upload_speed: number
+  download_speed: number
+  total_upload: number
+  total_download: number
 }
 
 interface ProxyStatus {
@@ -203,16 +218,20 @@ const formatBytes = (bytes: number) => {
 
 const updateSystemStats = async () => {
   try {
-    // 获取真实的系统统计信息
-    const systemStats = await invoke<SystemStats>('get_system_stats')
-    
-    // 更新系统资源信息
+    // 获取基础系统统计（CPU、内存）
+    const systemStats = await invoke('get_system_stats') as SystemStats
     cpuUsage.value = Math.round(systemStats.cpu_usage)
     memoryUsage.value = systemStats.memory_used
     
+    // 获取网络速度和流量统计
+     const networkStats = await invoke('get_network_speed') as NetworkSpeedStats
+     uploadSpeed.value = networkStats.upload_speed
+     downloadSpeed.value = networkStats.download_speed
+     totalTraffic.value = networkStats.total_upload + networkStats.total_download
+    
     // 获取TUN模式状态
     try {
-      const tunRunning = await invoke<boolean>('is_tun_running')
+      const tunRunning = await invoke('is_tun_running') as boolean
       tunEnabled.value = tunRunning
       if (tunRunning) {
         tunStatus.value = await invoke('get_tun_status')
@@ -222,7 +241,7 @@ const updateSystemStats = async () => {
     }
     
     // 获取代理状态信息
-    const proxyStatusData = await invoke<ProxyStatus>('get_proxy_status')
+    const proxyStatusData = await invoke('get_proxy_status') as ProxyStatus
     
     
     // 更新代理状态 - 使用后端返回的真实状态
@@ -232,11 +251,6 @@ const updateSystemStats = async () => {
       'disconnected': 'disconnected'
     }
     proxyStatus.value = statusMap[proxyStatusData.status] || 'disconnected'
-    
-    // 更新网络统计
-    uploadSpeed.value = proxyStatusData.upload_speed
-    downloadSpeed.value = proxyStatusData.download_speed
-    totalTraffic.value = proxyStatusData.total_upload + proxyStatusData.total_download
     
     // 更新当前服务器信息
     if (proxyStatusData.current_server && proxyStatusData.is_running) {
@@ -269,13 +283,39 @@ const updateSystemStats = async () => {
   }
 }
 
+// 监听代理模式变化事件
+const handleProxyModeChange = (event: any) => {
+  const { proxy_mode } = event.payload
+  
+  // 立即更新代理模式显示
+  const modeMap: { [key: string]: 'direct' | 'global' | 'pac' } = {
+    'direct': 'direct',
+    'global': 'global',
+    'pac': 'pac'
+  }
+  proxyMode.value = modeMap[proxy_mode] || 'direct'
+}
+
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   // 每秒更新一次统计信息
   updateInterval = setInterval(updateSystemStats, 1000)
   
   // 初始化数据
   updateSystemStats()
+  
+  // 监听代理模式变化事件
+  try {
+    const { listen } = await import('@tauri-apps/api/event')
+    const unlisten = await listen('proxy-mode-changed', handleProxyModeChange)
+    
+    // 组件卸载时清理监听器
+    onUnmounted(() => {
+      unlisten()
+    })
+  } catch (error) {
+    console.warn('监听代理模式变化事件失败:', error)
+  }
 })
 
 onUnmounted(() => {

@@ -11,6 +11,7 @@ use tauri::{
 mod commands;
 mod config;
 mod logger;
+mod network;
 mod proxy;
 mod system;
 mod tun;
@@ -336,6 +337,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::save_tun_config,
             commands::set_tun_system_route,
             commands::toggle_tun_mode,
+            // 网络统计
+            commands::get_network_speed,
+            commands::reset_network_stats,
         ])
         .setup(|app| {
             // 初始化应用配置
@@ -352,6 +356,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
             // 设置TunManager的应用句柄
             tun::TunManager::instance().set_app_handle(app.handle().clone());
+            
+            // 设置SystemManager的应用句柄
+            system::SystemManager::instance().set_app_handle(app.handle().clone());
+            
+            // 初始化网络统计模块
+            network::init_network_stats();
 
             // 创建系统托盘 - 使用异步任务
             let app_handle = app.handle().clone();

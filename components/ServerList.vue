@@ -873,9 +873,50 @@ const cancelEdit = () => {
   })
 }
 
-const changeProxyMode = (mode: string) => {
-  // TODO: 实现代理模式切换逻辑
-  console.log('切换代理模式:', mode)
+const changeProxyMode = async (mode: string) => {
+  try {
+    // 调用后端API设置代理模式
+    await invoke('set_proxy_mode', { mode })
+    
+    // 更新本地状态
+    proxyMode.value = mode
+    
+    // 如果当前有代理在运行，需要重新应用代理设置
+    if (runningServerId.value) {
+      // 重新启动代理以应用新的模式设置
+      await invoke('stop_proxy')
+      await invoke('start_proxy', { serverId: runningServerId.value })
+    }
+    
+    // 刷新系统代理状态
+    await refreshSystemProxyStatus()
+    
+    // 发射代理模式变化事件，通知其他组件更新
+    try {
+      const { emit } = await import('@tauri-apps/api/event')
+      await emit('proxy-mode-changed', {
+        proxy_mode: mode,
+        timestamp: Date.now()
+      })
+    } catch (error) {
+      console.warn('发射代理模式变化事件失败:', error)
+    }
+    
+    toast.add({
+      title: '代理模式已切换',
+      description: `代理模式已切换至: ${proxyModeOptions.find(opt => opt.value === mode)?.label || mode}`,
+      icon: 'i-heroicons-arrow-path',
+      color: 'green'
+    })
+  } catch (error) {
+    console.error('切换代理模式失败:', error)
+    toast.add({
+      title: '切换代理模式失败',
+      description: `无法切换代理模式: ${error.message || error}`,
+      icon: 'i-heroicons-exclamation-triangle',
+      color: 'red'
+    })
+  }
 }
 
 // 刷新系统代理状态
@@ -1111,10 +1152,31 @@ const regenerateConfig = async (serverId: string) => {
     console.log('代理状态已更新:', { is_running, current_server })
   }
 
+  // 加载代理模式配置
+  const loadProxyMode = async () => {
+    try {
+      const config = await invoke('get_app_config') as any
+      if (config && config.proxy_mode) {
+        proxyMode.value = config.proxy_mode
+      }
+    } catch (error) {
+      console.error('加载代理模式失败:', error)
+      toast.add({
+        title: '加载代理模式失败',
+        description: `无法加载当前代理模式设置: ${error.message || error}`,
+        icon: 'i-heroicons-exclamation-triangle',
+        color: 'red'
+      })
+      // 使用默认值
+      proxyMode.value = 'direct'
+    }
+  }
+
   // 组件挂载时初始化
   onMounted(async () => {
     await loadServers()
     await initializeProxyStatus()
+    await loadProxyMode()
     await refreshSystemProxyStatus()
     
     // 监听代理状态变化事件
