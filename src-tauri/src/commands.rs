@@ -10,11 +10,15 @@ use tauri::Emitter;
 use uuid::Uuid;
 
 use crate::config::AppConfig;
+use crate::{log_debug, log_info};
 use crate::network::NetworkSpeedStats;
 use crate::proxy::ProxyManager;
 use crate::system::SystemManager;
 use crate::tun::{TunConfig, TunManager, TunStatus};
 use crate::xray::XrayManager;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 /// 服务器信息结构体
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +56,15 @@ pub struct SystemStats {
     pub memory_used: u64,
     pub network_upload: u64,
     pub network_download: u64,
+}
+
+/// 日志条目结构体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogEntry {
+    pub timestamp: String,
+    pub level: String,
+    pub message: String,
+    pub details: Option<String>,
 }
 
 /// 获取服务器列表
@@ -602,13 +615,10 @@ pub async fn get_network_speed() -> Result<NetworkSpeedStats, String> {
     };
     
     if need_start {
-        println!("[DEBUG] 网络统计监控未启动，正在自动启动...");
-        if let Err(e) = manager.start_monitoring().await {
-            eprintln!("[ERROR] 自动启动网络统计监控失败: {}", e);
-            return Err(format!("启动网络统计监控失败: {}", e));
-        } else {
-            println!("[DEBUG] 网络统计监控自动启动成功");
-        }
+        log_debug!("网络统计监控未启动，正在自动启动...");
+        crate::network::init_network_stats();
+        log_debug!("网络统计监控已启动");
+         log_debug!("网络统计监控自动启动成功");
     }
     
     Ok(manager.get_current_speed())
@@ -764,4 +774,181 @@ pub async fn open_server_config_file(server_id: String) -> Result<(), String> {
     } else {
         Err(format!("服务器不存在: {}", server_id))
     }
+}
+
+/// 获取日志列表
+#[tauri::command]
+pub async fn get_logs(limit: Option<usize>) -> Result<Vec<LogEntry>, String> {
+    let limit = limit.unwrap_or(1000); // 默认返回最近1000条日志
+    
+    // 获取日志文件路径
+    let log_path = match AppConfig::load() {
+        Ok(config) => config.log_path,
+        Err(_) => "./log/ruray.log".to_string(),
+    };
+    
+    let log_file_path = Path::new(&log_path);
+    
+    if !log_file_path.exists() {
+        // 如果日志文件不存在，返回空列表
+        return Ok(vec![]);
+    }
+    
+    let file = File::open(log_file_path)
+        .map_err(|e| format!("无法打开日志文件: {}", e))?;
+    
+    let reader = BufReader::new(file);
+    let mut logs = Vec::new();
+    
+    // 读取所有行并解析
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("读取日志行失败: {}", e))?;
+        
+        if let Some(log_entry) = parse_log_line(&line) {
+            logs.push(log_entry);
+        }
+    }
+    
+    // 返回最近的日志条目
+    if logs.len() > limit {
+        logs = logs.into_iter().rev().take(limit).rev().collect();
+    }
+    
+    Ok(logs)
+}
+
+/// 解析日志行
+fn parse_log_line(line: &str) -> Option<LogEntry> {
+    // 日志格式: [2024-01-01 12:00:00.000] [INFO] 消息内容
+    if line.len() < 30 {
+        return None;
+    }
+    
+    // 提取时间戳
+    let timestamp_end = line.find("] [")?;
+    let timestamp = line[1..timestamp_end].to_string();
+    
+    // 提取日志级别
+    let level_start = timestamp_end + 3;
+    let level_end = line[level_start..].find("] ")? + level_start;
+    let level = line[level_start..level_end].to_lowercase();
+    
+    // 提取消息内容
+    let message_start = level_end + 2;
+    let message = line[message_start..].to_string();
+    
+    Some(LogEntry {
+        timestamp,
+        level,
+        message,
+        details: None,
+    })
+}
+
+/// 日志文件信息结构体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogInfo {
+    pub path: String,
+    pub size: u64,
+    pub count: usize,
+}
+
+/// 获取日志文件信息
+#[tauri::command]
+pub async fn get_log_info() -> Result<LogInfo, String> {
+    // 获取日志文件路径
+    let log_path = match AppConfig::load() {
+        Ok(config) => config.log_path,
+        Err(_) => "./log/ruray.log".to_string(),
+    };
+    
+    let log_file_path = Path::new(&log_path);
+    
+    if !log_file_path.exists() {
+        return Ok(LogInfo {
+            path: log_path,
+            size: 0,
+            count: 0,
+        });
+    }
+    
+    // 获取文件大小
+    let file_size = std::fs::metadata(log_file_path)
+        .map_err(|e| format!("无法获取日志文件信息: {}", e))?
+        .len();
+    
+    // 统计日志条目数量
+    let file = File::open(log_file_path)
+        .map_err(|e| format!("无法打开日志文件: {}", e))?;
+    
+    let reader = BufReader::new(file);
+    let line_count = reader.lines().count();
+    
+    Ok(LogInfo {
+        path: log_path,
+        size: file_size,
+        count: line_count,
+    })
+}
+
+/// 清理日志文件
+#[tauri::command]
+pub async fn clear_log_file() -> Result<(), String> {
+    // 获取日志文件路径
+    let log_path = match AppConfig::load() {
+        Ok(config) => config.log_path,
+        Err(_) => "./log/ruray.log".to_string(),
+    };
+    
+    let log_file_path = Path::new(&log_path);
+    
+    if log_file_path.exists() {
+        // 清空日志文件内容
+        std::fs::write(log_file_path, "")
+            .map_err(|e| format!("清理日志文件失败: {}", e))?;
+        
+        log_info!("日志文件已清理: {}", log_path);
+    }
+    
+    Ok(())
+}
+
+/// 打开文件目录
+#[tauri::command]
+pub async fn open_file_directory(file_path: String) -> Result<(), String> {
+    use std::process::Command;
+    
+    let path = std::path::Path::new(&file_path);
+    let dir_path = if path.is_file() {
+        path.parent().unwrap_or(path)
+    } else {
+        path
+    };
+    
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(dir_path)
+            .spawn()
+            .map_err(|e| format!("打开目录失败: {}", e))?;
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(dir_path)
+            .spawn()
+            .map_err(|e| format!("打开目录失败: {}", e))?;
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(dir_path)
+            .spawn()
+            .map_err(|e| format!("打开目录失败: {}", e))?;
+    }
+    
+    log_info!("已打开目录: {:?}", dir_path);
+    Ok(())
 }

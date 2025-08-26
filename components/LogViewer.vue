@@ -19,7 +19,7 @@
             variant="ghost"
             size="sm"
             @click="autoScroll = !autoScroll"
-            :color="autoScroll ? 'green' : 'gray'"
+            :color="autoScroll ? selectedThemeColor : 'gray'"
           >
             <Icon name="heroicons:arrow-down" class="w-4 h-4 mr-1" />
             自动滚动
@@ -30,6 +30,7 @@
             variant="ghost"
             size="sm"
             @click="clearLogs"
+            :color="selectedThemeColor"
           >
             <Icon name="heroicons:trash" class="w-4 h-4 mr-1" />
             清空
@@ -40,6 +41,7 @@
             variant="ghost"
             size="sm"
             @click="exportLogs"
+            :color="selectedThemeColor"
           >
             <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 mr-1" />
             导出
@@ -112,11 +114,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+
+// 获取应用配置以访问主题色
+const appConfig = useAppConfig()
+const selectedThemeColor = computed(() => appConfig.ui?.primary || 'green')
 
 // 接口定义
 interface LogEntry {
-  timestamp: Date
+  timestamp: string
   level: 'debug' | 'info' | 'warn' | 'error'
   message: string
   details?: string
@@ -124,24 +131,7 @@ interface LogEntry {
 
 // 状态
 const logContainer = ref<HTMLElement>()
-const logs = ref<LogEntry[]>([
-  {
-    timestamp: new Date(),
-    level: 'info',
-    message: 'RuRay 启动成功',
-    details: '版本: 1.0.0'
-  },
-  {
-    timestamp: new Date(Date.now() - 1000),
-    level: 'info',
-    message: '正在初始化 Xray Core...'
-  },
-  {
-    timestamp: new Date(Date.now() - 2000),
-    level: 'debug',
-    message: '加载配置文件: config.json'
-  }
-])
+const logs = ref<LogEntry[]>([])
 
 const logLevel = ref('info')
 const autoScroll = ref(true)
@@ -186,13 +176,18 @@ const getLogLevelColor = (level: string) => {
   return colors[level as keyof typeof colors] || 'blue'
 }
 
-const formatTime = (timestamp: Date) => {
-  return timestamp.toLocaleTimeString('zh-CN', {
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
+const formatTime = (timestamp: string) => {
+  try {
+    const date = new Date(timestamp)
+    return date.toLocaleTimeString('zh-CN', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } catch {
+    return timestamp
+  }
 }
 
 const scrollToBottom = () => {
@@ -200,6 +195,20 @@ const scrollToBottom = () => {
     nextTick(() => {
       logContainer.value!.scrollTop = logContainer.value!.scrollHeight
     })
+  }
+}
+
+// 从后端获取日志
+const fetchLogs = async () => {
+  try {
+    const backendLogs = await invoke('get_logs', { limit: 1000 }) as LogEntry[]
+    logs.value = backendLogs
+    // 只有在开启自动滚动时才滚动到底部
+    if (autoScroll.value) {
+      scrollToBottom()
+    }
+  } catch (error) {
+    console.error('获取日志失败:', error)
   }
 }
 
@@ -234,14 +243,16 @@ const exportLogs = async () => {
   }
 }
 
-// 添加新日志的方法
+// 添加新日志的方法（保留用于兼容性）
 const addLog = (level: LogEntry['level'], message: string, details?: string) => {
-  logs.value.push({
-    timestamp: new Date(),
+  const newLog: LogEntry = {
+    timestamp: new Date().toISOString(),
     level,
     message,
     details
-  })
+  }
+  
+  logs.value.push(newLog)
   
   // 限制日志数量，避免内存溢出
   if (logs.value.length > 1000) {
@@ -253,7 +264,27 @@ const addLog = (level: LogEntry['level'], message: string, details?: string) => 
 
 // 监听日志变化，自动滚动
 watch(() => logs.value.length, () => {
-  scrollToBottom()
+  if (autoScroll.value) {
+    scrollToBottom()
+  }
+})
+
+// 定时获取日志的定时器
+let logUpdateInterval: NodeJS.Timeout | null = null
+
+// 生命周期钩子
+onMounted(async () => {
+  // 初始加载日志
+  await fetchLogs()
+  
+  // 每5秒更新一次日志
+  logUpdateInterval = setInterval(fetchLogs, 5000)
+})
+
+onUnmounted(() => {
+  if (logUpdateInterval) {
+    clearInterval(logUpdateInterval)
+  }
 })
 
 // 暴露方法给父组件
@@ -261,27 +292,5 @@ defineExpose({
   addLog
 })
 
-// 模拟日志生成（开发时使用）
-if (process.dev) {
-  const simulateLogs = () => {
-    const messages = [
-      { level: 'info', message: '连接服务器成功' },
-      { level: 'debug', message: '发送心跳包' },
-      { level: 'warn', message: '连接延迟较高', details: '当前延迟: 500ms' },
-      { level: 'error', message: '连接失败', details: '网络超时' },
-      { level: 'info', message: '重新连接中...' }
-    ]
-    
-    setInterval(() => {
-      const randomMessage = messages[Math.floor(Math.random() * messages.length)]
-      addLog(
-        randomMessage.level as LogEntry['level'],
-        randomMessage.message,
-        randomMessage.details
-      )
-    }, 3000)
-  }
-  
-  setTimeout(simulateLogs, 2000)
-}
+
 </script>

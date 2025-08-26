@@ -340,6 +340,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // 网络统计
             commands::get_network_speed,
             commands::reset_network_stats,
+            // 日志管理
+            commands::get_logs,
+            commands::get_log_info,
+            commands::clear_log_file,
+            // 文件系统操作
+            commands::open_file_directory,
         ])
         .setup(|app| {
             // 初始化应用配置
@@ -347,7 +353,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             
             // 初始化日志系统
     if let Err(e) = logger::init_logger() {
-        eprintln!("初始化日志系统失败: {}", e);
+        log_error!("初始化日志系统失败: {}", e);
     }
     
     // 测试日志系统

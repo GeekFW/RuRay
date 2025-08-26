@@ -7,7 +7,7 @@
         <UButton
           size="sm"
           @click="resetToDefault"
-          color="gray"
+          :color="selectedThemeColor"
           variant="outline"
         >
           <Icon name="heroicons:arrow-path" class="w-4 h-4 mr-1" />
@@ -48,7 +48,7 @@
             <UButton
               icon="i-heroicons-arrow-path"
               size="xs"
-              color="gray"
+              :color="selectedThemeColor"
               variant="ghost"
               @click="refreshTunStatus"
               :loading="statusLoading"
@@ -158,7 +158,7 @@
         <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <UButton
             type="button"
-            color="gray"
+            :color="selectedThemeColor"
             variant="outline"
             @click="loadTunConfig"
             :disabled="configLoading"
@@ -167,6 +167,7 @@
           </UButton>
           <UButton
             type="submit"
+            :color="selectedThemeColor"
             :loading="configLoading"
             :disabled="tunStatus.is_running || !isConfigValid"
           >
@@ -181,6 +182,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+
+// 获取应用配置以访问主题色
+const appConfig = useAppConfig()
+const selectedThemeColor = computed(() => appConfig.ui?.primary || 'green')
 
 /**
  * TUN配置接口

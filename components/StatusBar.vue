@@ -172,7 +172,7 @@ const proxyModeText = computed(() => {
 })
 
 const tunModeText = computed(() => {
-  return tunEnabled.value ? 'TUN模式' : '直连模式'
+  return tunEnabled.value ? 'TUN模式' : '代理模式'
 })
 
 const uptime = computed(() => {

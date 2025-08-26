@@ -8,7 +8,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
-use tokio::time;
+use crate::{log_debug, log_error};
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::NetworkManagement::IpHelper::{
@@ -77,20 +77,17 @@ impl NetworkStatsManager {
 
     /// 启动网络统计监控
     pub async fn start_monitoring(&self) -> Result<()> {
-        println!("[DEBUG] start_monitoring 被调用");
+        log_debug!("start_monitoring 被调用");
         // 停止现有的监控任务
         self.stop_monitoring().await;
 
         // 获取初始基准统计
-        println!("[DEBUG] 获取初始基准统计");
         let initial_stats = self.get_total_network_stats().await?;
         let baseline = NetworkSnapshot {
             timestamp: Instant::now(),
             total_sent: initial_stats.iter().map(|s| s.bytes_sent).sum(),
             total_received: initial_stats.iter().map(|s| s.bytes_received).sum(),
         };
-
-        println!("[DEBUG] 基准统计 - 发送: {}, 接收: {}", baseline.total_sent, baseline.total_received);
 
         // 设置基准统计
         *self.baseline_stats.lock().unwrap() = Some(baseline.clone());
@@ -101,14 +98,10 @@ impl NetworkStatsManager {
         let baseline_stats = Arc::clone(&self.baseline_stats);
         let current_speed = Arc::clone(&self.current_speed);
 
-        println!("[DEBUG] 启动定时统计任务，每2秒执行一次");
+        log_debug!("启动定时统计任务，每1秒执行一次");
         let task = std::thread::spawn(move || {
-            println!("[DEBUG] 进入定时器循环（使用std::thread）");
-            
             loop {
-                println!("[DEBUG] 等待2秒...");
-                std::thread::sleep(Duration::from_secs(2));
-                println!("[DEBUG] 定时器触发，开始更新网络统计");
+                std::thread::sleep(Duration::from_secs(1));
                 
                 // 直接调用同步版本的网络统计更新
                 let result = Self::update_network_stats_sync(
@@ -116,27 +109,17 @@ impl NetworkStatsManager {
                     &baseline_stats,
                     &current_speed,
                 );
-                
-                match result {
-                    Ok(_) => {
-                        println!("[DEBUG] 网络统计更新成功");
-                    }
-                    Err(e) => {
-                        eprintln!("[ERROR] 更新网络统计失败: {}", e);
-                        // 继续循环，不要因为一次失败就退出
-                    }
-                }
             }
         });
         
         let task_handle = tokio::task::spawn_blocking(move || {
             if let Err(e) = task.join() {
-                eprintln!("[ERROR] 定时器线程异常退出: {:?}", e);
+                log_error!("定时器线程异常退出: {:?}", e);
             }
         });
         
         *self.stats_task.lock().unwrap() = Some(task_handle);
-        println!("[DEBUG] 网络统计监控任务已启动");
+        log_debug!("网络统计监控任务已启动");
         Ok(())
     }
 
@@ -163,24 +146,12 @@ impl NetworkStatsManager {
         let current_total_sent: u64 = current_stats.iter().map(|s| s.bytes_sent).sum();
         let current_total_received: u64 = current_stats.iter().map(|s| s.bytes_received).sum();
         let now = Instant::now();
-        
-        // 调试日志
-        println!("[DEBUG] 网络接口数量: {}", current_stats.len());
-        for (i, stat) in current_stats.iter().enumerate() {
-            println!("[DEBUG] 接口{}: {} - 发送: {} bytes, 接收: {} bytes", 
-                i, stat.name, stat.bytes_sent, stat.bytes_received);
-        }
-        println!("[DEBUG] 总发送: {} bytes, 总接收: {} bytes", current_total_sent, current_total_received);
 
         let mut last_snapshot_guard = last_snapshot.lock().unwrap();
         let baseline_guard = baseline_stats.lock().unwrap();
         
         if let (Some(last), Some(baseline)) = (last_snapshot_guard.as_ref(), baseline_guard.as_ref()) {
             let time_diff = now.duration_since(last.timestamp).as_secs_f64();
-            
-            println!("[DEBUG] 时间差: {:.2}秒", time_diff);
-            println!("[DEBUG] 上次快照 - 发送: {}, 接收: {}", last.total_sent, last.total_received);
-            println!("[DEBUG] 基线统计 - 发送: {}, 接收: {}", baseline.total_sent, baseline.total_received);
             
             if time_diff > 0.0 {
                 // 计算速度（bytes/s）
@@ -193,10 +164,6 @@ impl NetworkStatsManager {
                 let total_upload = current_total_sent.saturating_sub(baseline.total_sent);
                 let total_download = current_total_received.saturating_sub(baseline.total_received);
                 
-                println!("[DEBUG] 发送差值: {} bytes, 接收差值: {} bytes", sent_diff, received_diff);
-                println!("[DEBUG] 上传速度: {} bytes/s, 下载速度: {} bytes/s", upload_speed, download_speed);
-                println!("[DEBUG] 总上传: {} bytes, 总下载: {} bytes", total_upload, total_download);
-                
                 // 更新当前速度统计
                 *current_speed.lock().unwrap() = NetworkSpeedStats {
                     upload_speed,
@@ -206,7 +173,7 @@ impl NetworkStatsManager {
                 };
             }
         } else {
-            println!("[DEBUG] 缺少快照数据 - last: {}, baseline: {}", 
+            log_debug!("缺少快照数据 - last: {}, baseline: {}", 
                 last_snapshot_guard.is_some(), baseline_guard.is_some());
         }
 
@@ -231,24 +198,12 @@ impl NetworkStatsManager {
         let current_total_sent: u64 = current_stats.iter().map(|s| s.bytes_sent).sum();
         let current_total_received: u64 = current_stats.iter().map(|s| s.bytes_received).sum();
         let now = Instant::now();
-        
-        // 调试日志
-        println!("[DEBUG] 网络接口数量: {}", current_stats.len());
-        for (i, stat) in current_stats.iter().enumerate() {
-            println!("[DEBUG] 接口{}: {} - 发送: {} bytes, 接收: {} bytes", 
-                i, stat.name, stat.bytes_sent, stat.bytes_received);
-        }
-        println!("[DEBUG] 总发送: {} bytes, 总接收: {} bytes", current_total_sent, current_total_received);
 
         let mut last_snapshot_guard = last_snapshot.lock().unwrap();
         let baseline_guard = baseline_stats.lock().unwrap();
         
         if let (Some(last), Some(baseline)) = (last_snapshot_guard.as_ref(), baseline_guard.as_ref()) {
             let time_diff = now.duration_since(last.timestamp).as_secs_f64();
-            
-            println!("[DEBUG] 时间差: {:.2}秒", time_diff);
-            println!("[DEBUG] 上次快照 - 发送: {}, 接收: {}", last.total_sent, last.total_received);
-            println!("[DEBUG] 基线统计 - 发送: {}, 接收: {}", baseline.total_sent, baseline.total_received);
             
             if time_diff > 0.0 {
                 // 计算速度（bytes/s）
@@ -261,10 +216,6 @@ impl NetworkStatsManager {
                 let total_upload = current_total_sent.saturating_sub(baseline.total_sent);
                 let total_download = current_total_received.saturating_sub(baseline.total_received);
                 
-                println!("[DEBUG] 发送差值: {} bytes, 接收差值: {} bytes", sent_diff, received_diff);
-                println!("[DEBUG] 上传速度: {} bytes/s, 下载速度: {} bytes/s", upload_speed, download_speed);
-                println!("[DEBUG] 总上传: {} bytes, 总下载: {} bytes", total_upload, total_download);
-                
                 // 更新当前速度统计
                 *current_speed.lock().unwrap() = NetworkSpeedStats {
                     upload_speed,
@@ -274,7 +225,7 @@ impl NetworkStatsManager {
                 };
             }
         } else {
-            println!("[DEBUG] 缺少快照数据 - last: {}, baseline: {}", 
+            log_debug!("缺少快照数据 - last: {}, baseline: {}", 
                 last_snapshot_guard.is_some(), baseline_guard.is_some());
         }
 
@@ -328,13 +279,11 @@ impl NetworkStatsManager {
         use std::ffi::OsString;
         use std::os::windows::ffi::OsStringExt;
 
-        println!("[DEBUG] 开始获取Windows网络接口统计信息");
         let mut interfaces = Vec::new();
         let mut table_ptr: *mut MIB_IF_TABLE2 = ptr::null_mut();
 
         unsafe {
             let result = GetIfTable2(&mut table_ptr);
-            println!("[DEBUG] GetIfTable2 调用结果: {}", result);
             if result != 0 {
                 return Err(anyhow::anyhow!("获取网络接口表失败: {}", result));
             }
@@ -344,14 +293,12 @@ impl NetworkStatsManager {
             }
 
             let table = &*table_ptr;
-            println!("[DEBUG] 网络接口表条目数: {}", table.NumEntries);
             let entries = std::slice::from_raw_parts(
                 table.Table.as_ptr(),
                 table.NumEntries as usize,
             );
 
             for (i, entry) in entries.iter().enumerate() {
-                println!("[DEBUG] 处理接口 {}: OperStatus = {}", i, entry.OperStatus);
                 // 只统计活跃的网络接口
                 if entry.OperStatus == 1 { // IfOperStatusUp
                     // 转换接口名称
@@ -363,9 +310,6 @@ impl NetworkStatsManager {
                         .to_string_lossy()
                         .trim_end_matches('\0')
                         .to_string();
-                    
-                    println!("[DEBUG] 活跃接口: {} - InterfaceIndex: {}, OutOctets: {}, InOctets: {}", 
-                        name, entry.InterfaceIndex, entry.OutOctets, entry.InOctets);
                     
                     // 过滤掉虚拟接口和回环接口
                     if !name.is_empty() && 
@@ -381,9 +325,6 @@ impl NetworkStatsManager {
                                         name.contains("Wireless Network Connection");
                         
                         if is_physical {
-                            println!("[DEBUG] 保留物理接口: {} - OutOctets: {}, InOctets: {}", 
-                                name, entry.OutOctets, entry.InOctets);
-                            
                             interfaces.push(NetworkInterfaceStats {
                                 name,
                                 bytes_sent: entry.OutOctets,
@@ -400,7 +341,6 @@ impl NetworkStatsManager {
             FreeMibTable(table_ptr as *mut _);
         }
 
-        println!("[DEBUG] 找到 {} 个活跃网络接口", interfaces.len());
         Ok(interfaces)
     }
 
@@ -411,13 +351,12 @@ impl NetworkStatsManager {
         use std::ffi::OsString;
         use std::os::windows::ffi::OsStringExt;
 
-        println!("[DEBUG] 开始获取Windows网络接口统计信息");
+        log_debug!("开始获取Windows网络接口统计信息");
         let mut interfaces = Vec::new();
         let mut table_ptr: *mut MIB_IF_TABLE2 = ptr::null_mut();
 
         unsafe {
             let result = GetIfTable2(&mut table_ptr);
-            println!("[DEBUG] GetIfTable2 调用结果: {}", result);
             if result != 0 {
                 return Err(anyhow::anyhow!("获取网络接口表失败: {}", result));
             }
@@ -427,14 +366,12 @@ impl NetworkStatsManager {
             }
 
             let table = &*table_ptr;
-            println!("[DEBUG] 网络接口表条目数: {}", table.NumEntries);
             let entries = std::slice::from_raw_parts(
                 table.Table.as_ptr(),
                 table.NumEntries as usize,
             );
 
             for (i, entry) in entries.iter().enumerate() {
-                println!("[DEBUG] 处理接口 {}: OperStatus = {}", i, entry.OperStatus);
                 // 只统计活跃的网络接口
                 if entry.OperStatus == 1 { // IfOperStatusUp
                     // 转换接口名称
@@ -447,15 +384,10 @@ impl NetworkStatsManager {
                         .trim_end_matches('\0')
                         .to_string();
 
-                    println!("[DEBUG] 活跃接口: {} - InterfaceIndex: {}, OutOctets: {}, InOctets: {}", 
-                        name, entry.InterfaceIndex, entry.OutOctets, entry.InOctets);
-
                     // 过滤掉虚拟接口和过滤器驱动，只保留真正的物理接口
                     if !name.contains("Filter") && !name.contains("Virtual") && 
                        !name.contains("Loopback") && !name.contains("Teredo") &&
                        !name.contains("isatap") && !name.contains("Scheduler") {
-                        println!("[DEBUG] 保留物理接口: {} - OutOctets: {}, InOctets: {}", 
-                            name, entry.OutOctets, entry.InOctets);
                         interfaces.push(NetworkInterfaceStats {
                             name,
                             bytes_sent: entry.OutOctets,
@@ -467,8 +399,6 @@ impl NetworkStatsManager {
                 }
             }
             
-            println!("[DEBUG] 找到 {} 个活跃网络接口", interfaces.len());
-
             FreeMibTable(table_ptr as *mut _);
         }
 
@@ -548,40 +478,34 @@ impl NetworkStatsManager {
 
 /// 初始化网络统计管理器
 pub fn init_network_stats() {
-    println!("[DEBUG] ========== 开始初始化网络统计管理器 ==========");
-    eprintln!("[DEBUG] ========== 开始初始化网络统计管理器 ==========");
+    log_debug!("========== 开始初始化网络统计管理器 ==========");
     
     let handle = std::thread::spawn(|| {
-        println!("[DEBUG] ========== 网络统计线程已启动 ==========");
-        eprintln!("[DEBUG] ========== 网络统计线程已启动 ==========");
+        log_debug!("========== 网络统计线程已启动 ==========");
         
         match tokio::runtime::Runtime::new() {
             Ok(rt) => {
-                println!("[DEBUG] Tokio运行时创建成功");
+                log_debug!("Tokio运行时创建成功");
                 rt.block_on(async {
-                    println!("[DEBUG] ========== 开始启动网络统计监控 ==========");
-                    eprintln!("[DEBUG] ========== 开始启动网络统计监控 ==========");
+                    log_debug!("========== 开始启动网络统计监控 ==========");
                     let manager = NetworkStatsManager::instance();
                     match manager.start_monitoring().await {
                         Ok(_) => {
-                            println!("[DEBUG] ========== 网络统计监控启动成功 ==========");
-                            eprintln!("[DEBUG] ========== 网络统计监控启动成功 ==========");
+                            log_debug!("========== 网络统计监控启动成功 ==========");
                         },
                         Err(e) => {
-                            eprintln!("[ERROR] 启动网络统计监控失败: {}", e);
-                            println!("[ERROR] 启动网络统计监控失败: {}", e);
+                            log_error!("启动网络统计监控失败: {}", e);
                         }
                     }
                 });
             },
             Err(e) => {
-                eprintln!("[ERROR] 创建Tokio运行时失败: {}", e);
-                println!("[ERROR] 创建Tokio运行时失败: {}", e);
+                log_error!("创建Tokio运行时失败: {}", e);
             }
         }
     });
     
-    println!("[DEBUG] 网络统计线程句柄创建完成: {:?}", handle.thread().id());
+    log_debug!("网络统计线程句柄创建完成: {:?}", handle.thread().id());
 }
 
 /// 获取当前网络速度统计

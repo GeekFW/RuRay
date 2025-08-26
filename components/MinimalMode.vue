@@ -68,7 +68,7 @@
       <!-- 快速操作 -->
       <div class="grid grid-cols-2 gap-3">
         <UButton
-          :color="isConnected ? 'red' : 'green'"
+          :color="isConnected ? 'red' : selectedThemeColor"
           variant="solid"
           block
           @click="toggleConnection"
@@ -96,7 +96,7 @@
             v-for="mode in proxyModes"
             :key="mode.value"
             :variant="proxyMode === mode.value ? 'solid' : 'outline'"
-            :color="proxyMode === mode.value ? 'green' : 'gray'"
+            :color="proxyMode === mode.value ? selectedThemeColor : 'gray'"
             size="xs"
             @click="setProxyMode(mode.value)"
             class="text-xs"
@@ -167,6 +167,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+
+// 获取应用配置以访问主题色
+const appConfig = useAppConfig()
+const selectedThemeColor = computed(() => appConfig.ui?.primary || 'green')
 
 // 接口定义
 interface Server {

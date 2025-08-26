@@ -95,7 +95,8 @@
     <UModal v-model="showSettings" :ui="{
       container: 'flex min-h-full items-center justify-center p-4',
       wrapper: 'flex items-center justify-center min-h-full',
-      inner: 'flex items-center justify-center min-h-full'
+      inner: 'flex items-center justify-center min-h-full',
+      base: 'relative text-left rtl:text-right flex flex-col bg-white dark:bg-gray-900 shadow-xl w-full sm:max-w-xl rounded-lg sm:my-8'
     }">
       <div class="flex items-center justify-center min-h-full w-full">
         <UCard class="h-[90vh] max-h-[90vh] overflow-hidden flex flex-col w-[800px]">
@@ -344,8 +345,8 @@
                       </div>
 
                       <div v-if="!xrayExists || !geoFilesExist" class="mt-2">
-                        <UButton variant="outline" size="xs" @click="ensureAllXrayFiles" :loading="isEnsuring"
-                          color="blue">
+                        <UButton variant="outline" size="sm" @click="ensureAllXrayFiles" :loading="isEnsuring"
+                          :color="selectedThemeColor">
                           {{ isEnsuring ? '正在设置...' : '一键设置 Xray' }}
                         </UButton>
                       </div>
@@ -365,6 +366,11 @@
               <!-- TUN配置 Tab -->
               <div v-show="activeSettingsTab === 3" class="space-y-6">
                 <TunConfig />
+              </div>
+              
+              <!-- 日志设置 Tab -->
+              <div v-show="activeSettingsTab === 4" class="space-y-6">
+                <LogSettings />
               </div>
             </div>
           </div>
@@ -502,7 +508,8 @@ const settingsTabOptions = [
   { label: '基础设置', value: 0 },
   { label: '路由设置', value: 1 },
   { label: 'Core设置', value: 2 },
-  { label: 'TUN配置', value: 3 }
+  { label: 'TUN配置', value: 3 },
+  { label: '日志设置', value: 4 }
 ]
 
 // 计算属性：处理颜色模式选项的双向绑定

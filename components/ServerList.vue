@@ -7,6 +7,7 @@
         <UButton
           size="sm"
           @click="showAddServer = true"
+          :color="selectedThemeColor"
         >
           <Icon name="heroicons:plus" class="w-4 h-4 mr-1" />
           添加
@@ -46,7 +47,7 @@
             <UButton
               icon="i-heroicons-arrow-path"
               size="xs"
-              color="gray"
+              :color="selectedThemeColor"
               variant="ghost"
               @click="refreshSystemProxyStatus"
               :loading="systemProxyStatusLoading"
@@ -209,7 +210,7 @@
       <div v-if="servers.length === 0" class="text-center py-12">
         <Icon name="heroicons:server" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
         <p class="text-gray-500 dark:text-gray-400 mb-4">暂无服务器配置</p>
-        <UButton @click="showAddServer = true">
+        <UButton @click="showAddServer = true" :color="selectedThemeColor">
           <Icon name="heroicons:plus" class="w-4 h-4 mr-1" />
           添加第一个服务器
         </UButton>
@@ -364,7 +365,7 @@
             <UButton variant="ghost" @click="cancelEdit">
               取消
             </UButton>
-            <UButton @click="saveServer">
+            <UButton @click="saveServer" :color="selectedThemeColor">
               {{ editingServer ? '保存' : '添加' }}
             </UButton>
           </div>
@@ -380,6 +381,10 @@ import { invoke } from '@tauri-apps/api/core'
 
 // 全局 composables
 const toast = useToast()
+
+// 获取应用配置以访问主题色
+const appConfig = useAppConfig()
+const selectedThemeColor = computed(() => appConfig.ui?.primary || 'green')
 
 // 接口定义
 interface Server {
