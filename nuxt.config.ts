@@ -9,8 +9,21 @@ export default defineNuxtConfig({
   
   // Modules
   modules: [
-    '@nuxt/ui'
+    '@nuxt/ui',
+    '@nuxtjs/i18n'
   ],
+  
+  // i18n Configuration
+  i18n: {
+    locales: [
+      { code: 'en', name: 'English', file: 'en.json' },
+      { code: 'zh', name: '中文', file: 'zh.json' },
+      { code: 'ja', name: '日本語', file: 'ja.json' }
+    ],
+    defaultLocale: 'en',
+    langDir: 'locales/',
+    strategy: 'no_prefix'
+  },
   
   // UI Configuration
   ui: {

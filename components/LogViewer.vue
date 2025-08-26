@@ -3,11 +3,12 @@
     <!-- 头部 -->
     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">运行日志</h2>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $t('logViewer.title') }}</h2>
         
         <div class="flex items-center space-x-2">
           <!-- 日志级别过滤 -->
           <USelectMenu
+            class="w-24"
             v-model="logLevel"
             value-attribute="value"
             :options="logLevelOptions"
@@ -22,7 +23,7 @@
             :color="autoScroll ? selectedThemeColor : 'gray'"
           >
             <Icon name="heroicons:arrow-down" class="w-4 h-4 mr-1" />
-            自动滚动
+            {{ $t('logViewer.autoScroll') }}
           </UButton>
           
           <!-- 清空日志 -->
@@ -33,7 +34,7 @@
             :color="selectedThemeColor"
           >
             <Icon name="heroicons:trash" class="w-4 h-4 mr-1" />
-            清空
+            {{ $t('common.clear') }}
           </UButton>
           
           <!-- 导出日志 -->
@@ -44,7 +45,7 @@
             :color="selectedThemeColor"
           >
             <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 mr-1" />
-            导出
+            {{ $t('common.export') }}
           </UButton>
         </div>
       </div>
@@ -57,7 +58,7 @@
     >
       <div v-if="filteredLogs.length === 0" class="text-center py-12">
         <Icon name="heroicons:document-text" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p class="text-gray-500 dark:text-gray-400">暂无日志信息</p>
+        <p class="text-gray-500 dark:text-gray-400">{{ $t('logViewer.noLogs') }}</p>
       </div>
       
       <div v-else class="space-y-1">
@@ -104,9 +105,9 @@
     <!-- 底部状态 -->
     <div class="p-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
       <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>共 {{ logs.length }} 条日志</span>
+        <span>{{ $t('logViewer.totalLogs', { count: logs.length }) }}</span>
         <span v-if="filteredLogs.length !== logs.length">
-          显示 {{ filteredLogs.length }} 条
+          {{ $t('logViewer.showingLogs', { count: filteredLogs.length }) }}
         </span>
       </div>
     </div>
@@ -116,6 +117,10 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useI18n } from 'vue-i18n'
+
+// 国际化
+const { t: $t } = useI18n()
 
 // 获取应用配置以访问主题色
 const appConfig = useAppConfig()
@@ -137,12 +142,12 @@ const logLevel = ref('info')
 const autoScroll = ref(true)
 
 // 选项
-const logLevelOptions = [
-  { label: '全部', value: 'debug' },
-  { label: '信息', value: 'info' },
-  { label: '警告', value: 'warn' },
-  { label: '错误', value: 'error' }
-]
+const logLevelOptions = computed(() => [
+  { label: $t('logViewer.levels.all'), value: 'debug' },
+  { label: $t('logViewer.levels.info'), value: 'info' },
+  { label: $t('logViewer.levels.warn'), value: 'warn' },
+  { label: $t('logViewer.levels.error'), value: 'error' }
+])
 
 // 计算属性
 const filteredLogs = computed(() => {
@@ -208,7 +213,7 @@ const fetchLogs = async () => {
       scrollToBottom()
     }
   } catch (error) {
-    console.error('获取日志失败:', error)
+    console.error($t('logViewer.fetchLogsFailed'), error)
   }
 }
 
@@ -238,7 +243,7 @@ const exportLogs = async () => {
       // TODO: 显示成功通知
     }
   } catch (error) {
-    console.error('导出日志失败:', error)
+    console.error($t('logViewer.exportLogsFailed'), error)
     // TODO: 显示错误通知
   }
 }

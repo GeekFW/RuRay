@@ -1,6 +1,6 @@
 <template>
   <div
-    class="h-12 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 drag-region">
+    class="h-12 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 drag-region select-none">
     <!-- 左侧 Logo 和标题 -->
     <div class="flex items-center space-x-3 no-drag">
       <div class="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center">
@@ -13,12 +13,12 @@
     <div class="flex items-center space-x-1 no-drag">
       <UButton variant="ghost" size="sm" @click="showUpdateDialog = true">
         <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 mr-1" />
-        更新 Xray Core
+        {{ $t('header.updateXrayCore') }}
       </UButton>
 
       <UButton variant="ghost" size="sm" @click="toggleMinimalMode">
         <Icon name="heroicons:minus" class="w-4 h-4 mr-1" />
-        极简模式
+        {{ $t('header.minimalMode') }}
       </UButton>
     </div>
 
@@ -56,13 +56,13 @@
         <template #header>
           <div class="flex items-center space-x-2">
             <Icon name="heroicons:arrow-down-tray" class="w-5 h-5 text-green-500" />
-            <span>更新 Xray Core</span>
+            <span>{{ $t('header.updateXrayCore') }}</span>
           </div>
         </template>
 
         <div class="space-y-4">
           <p class="text-gray-600 dark:text-gray-400">
-            检查并下载最新版本的 Xray Core
+            {{ $t('update.checkAndDownload') }}
           </p>
 
           <div v-if="updateStatus" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -71,7 +71,7 @@
 
           <div v-if="updateProgress > 0" class="space-y-2">
             <div class="flex justify-between text-sm">
-              <span>下载进度</span>
+              <span>{{ $t('update.downloadProgress') }}</span>
               <span>{{ updateProgress }}%</span>
             </div>
             <UProgress :value="updateProgress" />
@@ -81,10 +81,10 @@
         <template #footer>
           <div class="flex justify-end space-x-2">
             <UButton variant="ghost" @click="showUpdateDialog = false" :disabled="isUpdating">
-              取消
+              {{ $t('common.cancel') }}
             </UButton>
             <UButton @click="startUpdate" :loading="isUpdating">
-              {{ isUpdating ? '更新中...' : '开始更新' }}
+              {{ isUpdating ? $t('update.updating') : $t('update.startUpdate') }}
             </UButton>
           </div>
         </template>
@@ -96,7 +96,7 @@
       container: 'flex min-h-full items-center justify-center p-4',
       wrapper: 'flex items-center justify-center min-h-full',
       inner: 'flex items-center justify-center min-h-full',
-      base: 'relative text-left rtl:text-right flex flex-col bg-white dark:bg-gray-900 shadow-xl w-full sm:max-w-xl rounded-lg sm:my-8'
+      base: 'relative text-left rtl:text-right flex flex-col bg-white dark:bg-gray-900 shadow-xl w-full lg:max-w-4xl  md:max-w-2xl rounded-lg sm:my-8'
     }">
       <div class="flex items-center justify-center min-h-full w-full">
         <UCard class="h-[90vh] max-h-[90vh] overflow-hidden flex flex-col w-[800px]">
@@ -104,7 +104,7 @@
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-2">
                 <Icon name="heroicons:cog-6-tooth" class="w-5 h-5 text-green-500" />
-                <span>设置</span>
+                <span>{{ $t('settings.title') }}</span>
               </div>
               <UButton variant="ghost" size="sm" icon="i-heroicons-x-mark" @click="showSettings = false"
                 class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
@@ -131,17 +131,32 @@
             <div class="flex-1 min-h-0 max-h-[calc(90vh-240px)] overflow-y-auto px-6 py-6">
               <!-- 基础设置 Tab -->
               <div v-show="activeSettingsTab === 0" class="space-y-6">
+                <!-- 语言设置 -->
+                <div>
+                  <h3 class="text-lg font-medium mb-2">{{ $t('settings.language.title') }}</h3>
+                  <div class="flex items-center justify-between mb-4">
+                    <span>{{ $t('settings.language.interfaceLanguage') }}</span>
+                    <USelectMenu
+                      class="w-28"
+                      v-model="selectedLanguage" 
+                      value-attribute="value" 
+                      :options="languageOptions"
+                      @change="setLanguage" 
+                    />
+                  </div>
+                </div>
+                
                 <!-- 主题设置 -->
                 <div>
-                  <h3 class="text-lg font-medium mb-2">主题设置</h3>
+                  <h3 class="text-lg font-medium mb-2">{{ $t('settings.theme.title') }}</h3>
                   <div class="flex items-center justify-between mb-4">
-                    <span>颜色模式</span>
+                    <span>{{ $t('settings.theme.colorMode') }}</span>
                     <USelectMenu v-model="selectedColorModeOption" value-attribute="value" :options="colorModeOptions"
                       @change="setColorMode" />
                   </div>
 
                   <div class="flex items-center justify-between mb-4">
-                    <span>主题色</span>
+                    <span>{{ $t('settings.theme.themeColor') }}</span>
                     <div class="flex space-x-2">
                       <button v-for="color in themeColors" :key="color.name" :class="[
                         'w-6 h-6 rounded-full border-2',
@@ -152,46 +167,46 @@
                 </div>
                 <!-- 代理设置 -->
                 <div>
-                  <h3 class="text-lg font-medium mb-2">代理设置</h3>
+                  <h3 class="text-lg font-medium mb-2">{{ $t('settings.proxy.title') }}</h3>
                   <div class="space-y-3">
-                    <div class="flex items-center justify-between">
-                      <span>HTTP 代理端口</span>
-                      <UInput v-model="httpPort" type="number" placeholder="10086" class="w-24" />
-                    </div>
+                      <div class="flex items-center justify-between">
+                        <span>{{ $t('settings.proxy.httpPort') }}</span>
+                        <UInput v-model="httpPort" type="number" placeholder="10086" class="w-24" />
+                      </div>
 
-                    <div class="flex items-center justify-between">
-                      <span>SOCKS 代理端口</span>
-                      <UInput v-model="socksPort" type="number" placeholder="10087" class="w-24" />
-                    </div>
+                      <div class="flex items-center justify-between">
+                        <span>{{ $t('settings.proxy.socksPort') }}</span>
+                        <UInput v-model="socksPort" type="number" placeholder="10087" class="w-24" />
+                      </div>
 
-                    <div class="flex items-center justify-between">
-                      <span>启动时自动连接</span>
-                      <UToggle v-model="autoConnect" />
-                    </div>
+                      <div class="flex items-center justify-between">
+                        <span>{{ $t('settings.proxy.autoConnect') }}</span>
+                        <UToggle v-model="autoConnect" />
+                      </div>
 
                     <div class="border-t pt-3 mt-3">
-                      <h4 class="text-sm font-medium mb-3">Inbound 高级设置</h4>
+                        <h4 class="text-sm font-medium mb-3">{{ $t('settings.proxy.advancedSettings') }}</h4>
 
-                      <div class="space-y-4">
-                        <div class="flex items-center justify-between py-1">
-                          <span class="text-sm">启用流量嗅探</span>
-                          <UToggle v-model="inboundSniffingEnabled" />
-                        </div>
+                        <div class="space-y-4">
+                          <div class="flex items-center justify-between py-1">
+                            <span class="text-sm">{{ $t('settings.proxy.enableSniffing') }}</span>
+                            <UToggle v-model="inboundSniffingEnabled" />
+                          </div>
 
-                        <div class="flex items-center justify-between py-1">
-                          <span class="text-sm">启用 UDP 转发</span>
-                          <UToggle v-model="inboundUdpEnabled" />
-                        </div>
+                          <div class="flex items-center justify-between py-1">
+                            <span class="text-sm">{{ $t('settings.proxy.enableUdp') }}</span>
+                            <UToggle v-model="inboundUdpEnabled" />
+                          </div>
 
-                        <div class="flex items-center justify-between py-1">
-                          <span class="text-sm">允许透明代理</span>
-                          <UToggle v-model="inboundAllowTransparent" />
-                        </div>
+                          <div class="flex items-center justify-between py-1">
+                            <span class="text-sm">{{ $t('settings.proxy.allowTransparent') }}</span>
+                            <UToggle v-model="inboundAllowTransparent" />
+                          </div>
 
-                        <div class="flex items-center justify-between py-1">
-                          <span class="text-sm">认证方式</span>
-                          <USelect v-model="inboundAuthMethod" :options="authMethodOptions" class="w-24" />
-                        </div>
+                          <div class="flex items-center justify-between py-1">
+                            <span class="text-sm">{{ $t('settings.proxy.authMethod') }}</span>
+                            <USelect v-model="inboundAuthMethod" :options="authMethodOptions" class="w-24" />
+                          </div>
                       </div>
                     </div>
                   </div>
@@ -201,54 +216,54 @@
               <!-- 路由设置 Tab -->
               <div v-show="activeSettingsTab === 1" class="space-y-6">
                 <div>
-                  <h3 class="text-lg font-medium mb-3">路由设置</h3>
+                  <h3 class="text-lg font-medium mb-3">{{ $t('settings.routing.title') }}</h3>
                   <div class="space-y-4">
                     <div class="flex items-center justify-between">
-                      <span>域名策略</span>
+                      <span>{{ $t('settings.routing.domainStrategy') }}</span>
                       <USelectMenu class="w-32" v-model="routingDomainStrategy" value-attribute="value"
                         :options="domainStrategyOptions" />
                     </div>
 
                     <div class="border-t pt-4">
                       <div class="flex items-center justify-between mb-3">
-                        <h4 class="text-sm font-medium">路由规则</h4>
+                        <h4 class="text-sm font-medium">{{ $t('settings.routing.rules') }}</h4>
                         <UButton variant="outline" size="xs" @click="addRoutingRule" icon="i-heroicons-plus">
-                          添加规则
+                          {{ $t('settings.routing.addRule') }}
                         </UButton>
                       </div>
 
                       <div class="space-y-3 max-h-60 overflow-y-auto">
                         <div v-for="(rule, index) in routingRules" :key="index" class="border rounded-lg p-3 space-y-3">
                           <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium">规则 {{ index + 1 }}</span>
+                            <span class="text-sm font-medium">{{ $t('routing.rule') }} {{ index + 1 }}</span>
                             <UButton variant="ghost" size="xs" color="red" @click="removeRoutingRule(index)"
                               icon="i-heroicons-trash" />
                           </div>
 
                           <div class="grid grid-cols-2 gap-3">
                             <div>
-                              <label class="text-xs text-gray-500 dark:text-gray-400">出站标签</label>
+                              <label class="text-xs text-gray-500 dark:text-gray-400">{{ $t('routing.outboundTag') }}</label>
                               <USelectMenu v-model="rule.outboundTag" value-attribute="value"
                                 :options="outboundTagOptions" class="mt-1" />
                             </div>
                             <div>
-                              <label class="text-xs text-gray-500 dark:text-gray-400">规则类型</label>
+                              <label class="text-xs text-gray-500 dark:text-gray-400">{{ $t('routing.ruleType') }}</label>
                               <UInput v-model="rule.type" placeholder="field" class="mt-1" readonly />
                             </div>
                           </div>
 
                           <div>
-                            <label class="text-xs text-gray-500 dark:text-gray-400">IP 规则</label>
+                            <label class="text-xs text-gray-500 dark:text-gray-400">{{ $t('routing.ipRules') }}</label>
                             <div class="mt-1 space-y-2">
                               <div class="flex space-x-2">
                                 <USelectMenu v-model="newIpRule[index]" value-attribute="value"
-                                  :options="ipPresetOptions" placeholder="选择预设或手动输入" class="flex-1" />
+                                  :options="ipPresetOptions" :placeholder="$t('routing.selectPresetOrManual')" class="flex-1" />
                                 <UButton variant="outline" size="xs" @click="addIpRule(index)"
                                   :disabled="!newIpRule[index]">
-                                  添加
+                                  {{ $t('common.add') }}
                                 </UButton>
                               </div>
-                              <UInput v-model="customIpRule[index]" placeholder="或手动输入 IP 规则" class="text-xs"
+                              <UInput v-model="customIpRule[index]" :placeholder="$t('routing.manualIpRule')" class="text-xs"
                                 @keyup.enter="addCustomIpRule(index)" />
                               <div class="flex flex-wrap gap-1">
                                 <UBadge v-for="(ip, ipIndex) in rule.ip" :key="ipIndex" variant="soft" size="sm"
@@ -261,17 +276,17 @@
                           </div>
 
                           <div>
-                            <label class="text-xs text-gray-500 dark:text-gray-400">域名规则</label>
+                            <label class="text-xs text-gray-500 dark:text-gray-400">{{ $t('routing.domainRules') }}</label>
                             <div class="mt-1 space-y-2">
                               <div class="flex space-x-2">
                                 <USelectMenu v-model="newDomainRule[index]" value-attribute="value"
-                                  :options="domainPresetOptions" placeholder="选择预设或手动输入" class="flex-1" />
+                                  :options="domainPresetOptions" :placeholder="$t('routing.selectPresetOrManual')" class="flex-1" />
                                 <UButton variant="outline" size="xs" @click="addDomainRule(index)"
                                   :disabled="!newDomainRule[index]">
-                                  添加
+                                  {{ $t('common.add') }}
                                 </UButton>
                               </div>
-                              <UInput v-model="customDomainRule[index]" placeholder="或手动输入域名规则" class="text-xs"
+                              <UInput v-model="customDomainRule[index]" :placeholder="$t('routing.manualDomainRule')" class="text-xs"
                                 @keyup.enter="addCustomDomainRule(index)" />
                               <div class="flex flex-wrap gap-1">
                                 <UBadge v-for="(domain, domainIndex) in rule.domain" :key="domainIndex" variant="soft"
@@ -292,26 +307,26 @@
               <!-- Core设置 Tab -->
               <div v-show="activeSettingsTab === 2" class="space-y-6">
                 <div>
-                  <h3 class="text-lg font-medium mb-3">Xray Core 设置</h3>
+                  <h3 class="text-lg font-medium mb-3">{{ $t('settings.core.title') }}</h3>
                   <div class="space-y-2">
                     <div class="flex items-center justify-between">
-                      <span>Xray Core 路径</span>
+                      <span>{{ $t('settings.core.path') }}</span>
                       <div class="flex space-x-2">
                         <UButton variant="outline" size="xs" @click="selectXrayPath" :disabled="isSelectingPath">
-                          {{ isSelectingPath ? '选择中...' : '浏览' }}
+                          {{ isSelectingPath ? $t('core.selecting') : $t('settings.core.browse') }}
                         </UButton>
                         <UButton variant="ghost" size="xs" @click="clearXrayPath" :disabled="!xrayPath" color="red">
-                          清空
+                          {{ $t('settings.core.clear') }}
                         </UButton>
                       </div>
                     </div>
                     <UInput v-model="xrayPath" :placeholder="defaultXrayPathPlaceholder" class="text-xs" />
                     <div class="text-xs text-gray-500 dark:text-gray-400">
                       <span v-if="!xrayPath">
-                        默认路径: {{ defaultXrayPath }}
+                        {{ $t('core.defaultPath') }}: {{ defaultXrayPath }}
                       </span>
                       <span v-else>
-                        自定义路径: {{ xrayPath }}
+                        {{ $t('core.customPath') }}: {{ xrayPath }}
                       </span>
                     </div>
                     <div class="space-y-2">
@@ -322,10 +337,10 @@
                         ]"></div>
                         <span
                           :class="xrayExists ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                          {{ xrayExists ? 'Xray Core 已找到' : 'Xray Core 未找到' }}
+                          {{ xrayExists ? $t('settings.core.found') : $t('settings.core.notFound') }}
                         </span>
                         <UButton variant="ghost" size="xs" @click="checkXrayExists" :loading="isCheckingXray">
-                          重新检查
+                          {{ $t('settings.core.recheck') }}
                         </UButton>
                       </div>
 
@@ -336,18 +351,18 @@
                         ]"></div>
                         <span
                           :class="geoFilesExist ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                          {{ geoFilesExist ? '地理位置数据文件已找到' : '地理位置数据文件缺失' }}
+                          {{ geoFilesExist ? $t('core.geoFilesFound') : $t('core.geoFilesMissing') }}
                         </span>
                         <UButton variant="ghost" size="xs" @click="downloadGeoFiles" :loading="isDownloadingGeoFiles"
                           v-if="!geoFilesExist">
-                          下载
+                          {{ $t('core.download') }}
                         </UButton>
                       </div>
 
                       <div v-if="!xrayExists || !geoFilesExist" class="mt-2">
                         <UButton variant="outline" size="sm" @click="ensureAllXrayFiles" :loading="isEnsuring"
                           :color="selectedThemeColor">
-                          {{ isEnsuring ? '正在设置...' : '一键设置 Xray' }}
+                          {{ isEnsuring ? $t('core.setting') : $t('core.oneClickSetup') }}
                         </UButton>
                       </div>
 
@@ -379,10 +394,10 @@
             <div class="absolute bottom-4 left-0 right-0 px-6">
               <div class="flex justify-end space-x-2">
                 <UButton variant="ghost" @click="showSettings = false">
-                  取消
+                  {{ $t('common.cancel') }}
                 </UButton>
                 <UButton @click="saveSettings">
-                  保存
+                  {{ $t('common.save') }}
                 </UButton>
               </div>
             </div>
@@ -398,8 +413,10 @@ import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
+import { useI18n } from 'vue-i18n'
 
 const toast = useToast()
+const { t: $t } = useI18n()
 
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
@@ -417,6 +434,7 @@ const updateProgress = ref(0)
 // 设置选项
 const selectedColorMode = ref(colorMode.preference)
 const selectedThemeColor = ref(appConfig.ui?.primary || 'green')
+const selectedLanguage = ref('en') // 默认英语
 const httpPort = ref(10086)
 const socksPort = ref(10087)
 const autoConnect = ref(false)
@@ -451,7 +469,7 @@ const isSelectingPath = ref(false)
 const isCheckingXray = ref(false)
 const defaultXrayPath = ref('')
 const defaultXrayPathPlaceholder = computed(() =>
-  defaultXrayPath.value ? `留空使用默认路径: ${defaultXrayPath.value}` : '留空使用默认路径'
+  defaultXrayPath.value ? `${$t('settings.core.defaultPathHint')}: ${defaultXrayPath.value}` : $t('settings.core.defaultPathHint')
 )
 
 // 地理位置数据文件相关状态
@@ -461,11 +479,11 @@ const isEnsuring = ref(false)
 const setupProgress = ref(0)
 const setupStatus = ref('')
 
-const colorModeOptions = [
-  { label: '跟随系统', value: 'system' },
-  { label: '浅色模式', value: 'light' },
-  { label: '深色模式', value: 'dark' }
-]
+const colorModeOptions = computed(() => [
+  { label: $t('settings.theme.followSystem'), value: 'system' },
+  { label: $t('settings.theme.lightMode'), value: 'light' },
+  { label: $t('settings.theme.darkMode'), value: 'dark' }
+])
 
 const themeColors = [
   { name: 'green', value: '#22c55e' },
@@ -475,10 +493,16 @@ const themeColors = [
   { name: 'orange', value: '#f97316' }
 ]
 
-const authMethodOptions = [
-  { label: '无认证', value: 'noauth' },
-  { label: '用户名密码', value: 'password' }
+const languageOptions = [
+  { label: 'English', value: 'en' },
+  { label: '中文', value: 'zh' },
+  { label: '日本語', value: 'ja' }
 ]
+
+const authMethodOptions = computed(() => [
+  { label: $t('settings.proxy.noAuth'), value: 'noauth' },
+  { label: $t('settings.proxy.password'), value: 'password' }
+])
 
 const domainStrategyOptions = [
   { label: 'AsIs', value: 'AsIs' },
@@ -486,31 +510,31 @@ const domainStrategyOptions = [
   { label: 'IPOnDemand', value: 'IPOnDemand' }
 ]
 
-const outboundTagOptions = [
-  { label: '代理', value: 'proxy' },
-  { label: '直连', value: 'direct' },
-  { label: '阻断', value: 'block' }
-]
+const outboundTagOptions = computed(() => [
+  { label: $t('routing.proxy'), value: 'proxy' },
+  { label: $t('routing.direct'), value: 'direct' },
+  { label: $t('routing.block'), value: 'block' }
+])
 
-const ipPresetOptions = [
-  { label: '私有地址', value: 'geoip:private' },
-  { label: '中国大陆', value: 'geoip:cn' },
-  { label: '非中国大陆', value: 'geoip:!cn' }
-]
+const ipPresetOptions = computed(() => [
+  { label: $t('routing.privateAddress'), value: 'geoip:private' },
+  { label: $t('routing.chinaMainland'), value: 'geoip:cn' },
+  { label: $t('routing.nonChinaMainland'), value: 'geoip:!cn' }
+])
 
-const domainPresetOptions = [
-  { label: '中国大陆网站', value: 'geosite:cn' },
-  { label: '私有域名', value: 'geosite:private' },
-  { label: '非中国大陆网站', value: 'geosite:!cn' }
-]
+const domainPresetOptions = computed(() => [
+  { label: $t('routing.chinaMainlandSites'), value: 'geosite:cn' },
+  { label: $t('routing.privateDomains'), value: 'geosite:private' },
+  { label: $t('routing.nonChinaMainlandSites'), value: 'geosite:!cn' }
+])
 
-const settingsTabOptions = [
-  { label: '基础设置', value: 0 },
-  { label: '路由设置', value: 1 },
-  { label: 'Core设置', value: 2 },
-  { label: 'TUN配置', value: 3 },
-  { label: '日志设置', value: 4 }
-]
+const settingsTabOptions = computed(() => [
+  { label: $t('settings.tabs.basic'), value: 0 },
+  { label: $t('settings.tabs.routing'), value: 1 },
+  { label: $t('settings.tabs.core'), value: 2 },
+  { label: $t('settings.tabs.tun'), value: 3 },
+  { label: $t('settings.tabs.logs'), value: 4 }
+])
 
 // 计算属性：处理颜色模式选项的双向绑定
 const selectedColorModeOption = computed({
@@ -556,6 +580,24 @@ const setThemeColor = (color: string) => {
       primary: color
     }
   })
+}
+
+const setLanguage = async (option: any) => {
+  const language = typeof option === 'string' ? option : option.value
+  selectedLanguage.value = language
+  
+  // 切换i18n语言
+  const { $i18n } = useNuxtApp()
+  await $i18n.setLocale(language)
+  
+  // 保存语言配置到后端
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('update_language_config', { language })
+    console.log('Language changed to:', language)
+  } catch (error) {
+    console.error('Failed to save language config:', error)
+  }
 }
 
 // 定义事件
@@ -663,11 +705,11 @@ const startUpdate = async () => {
 
   try {
     // 检查是否有可用更新
-    updateStatus.value = '检查更新中...'
+    updateStatus.value = $t('header.updateStatus.checking')
     const availableUpdate = await invoke('check_xray_update')
 
     if (!availableUpdate) {
-      updateStatus.value = '已是最新版本'
+      updateStatus.value = $t('header.updateStatus.latest')
       setTimeout(() => {
         showUpdateDialog.value = false
         isUpdating.value = false
@@ -705,7 +747,7 @@ const startUpdate = async () => {
 
   } catch (error) {
     console.error('更新失败:', error)
-    updateStatus.value = `更新失败: ${error}`
+    updateStatus.value = `${$t('header.updateStatus.error')}: ${error}`
     isUpdating.value = false
   }
 }
@@ -741,8 +783,8 @@ const saveSettings = async () => {
     // 保存配置
     await invoke('save_app_config', { config })
     toast.add({
-      title: '保存设置成功',
-      description: `保存设置成功`,
+      title: $t('settings.saveSuccess'),
+      description: $t('settings.saveSuccess'),
       icon: 'i-heroicons-pencil',
       color: 'green'
     })
@@ -750,8 +792,8 @@ const saveSettings = async () => {
     showSettings.value = false
   } catch (error) {
     toast.add({
-      title: '保存设置失败',
-      description: `保存设置失败: ${error}`,
+      title: $t('settings.saveError'),
+      description: `${$t('settings.saveError')}: ${error}`,
       icon: 'i-heroicons-pencil',
       color: 'red'
     })
@@ -765,7 +807,7 @@ const selectXrayPath = async () => {
     isSelectingPath.value = true
 
     const selected = await open({
-      title: '选择 Xray Core 可执行文件',
+      title: $t('settings.core.selectFile'),
       filters: [{
         name: 'Executable',
         extensions: ['exe']
@@ -899,6 +941,19 @@ const loadSettings = async () => {
     socksPort.value = config.socks_port || 10087
     autoConnect.value = config.auto_connect || false
     selectedThemeColor.value = config.theme_color || 'green'
+    
+    // 加载语言配置
+    try {
+      const currentLanguage = await invoke('get_language_config') as string
+      selectedLanguage.value = currentLanguage
+      
+      // 设置i18n语言
+      const { $i18n } = useNuxtApp()
+      await $i18n.setLocale(currentLanguage)
+    } catch (error) {
+      console.error('加载语言配置失败:', error)
+      selectedLanguage.value = 'en' // 默认英语
+    }
 
     // 加载 inbound 配置
     inboundSniffingEnabled.value = config.inbound_sniffing_enabled || false

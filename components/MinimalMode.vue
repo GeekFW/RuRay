@@ -39,7 +39,7 @@
         <div class="text-center">
           <div class="flex items-center justify-center space-x-1 mb-1">
             <Icon name="heroicons:arrow-up" class="w-4 h-4 text-green-400" />
-            <span class="text-sm text-gray-300">上传</span>
+            <span class="text-sm text-gray-300">{{ $t('minimalMode.upload') }}</span>
           </div>
           <div class="speed-display text-lg font-bold text-green-400">
             {{ formatSpeed(uploadSpeed) }}
@@ -49,7 +49,7 @@
         <div class="text-center">
           <div class="flex items-center justify-center space-x-1 mb-1">
             <Icon name="heroicons:arrow-down" class="w-4 h-4 text-blue-400" />
-            <span class="text-sm text-gray-300">下载</span>
+            <span class="text-sm text-gray-300">{{ $t('minimalMode.download') }}</span>
           </div>
           <div class="speed-display text-lg font-bold text-blue-400">
             {{ formatSpeed(downloadSpeed) }}
@@ -59,7 +59,7 @@
       
       <!-- 流量统计 -->
       <div class="text-center mb-6">
-        <div class="text-sm text-gray-300 mb-1">总流量</div>
+        <div class="text-sm text-gray-300 mb-1">{{ $t('minimalMode.totalTraffic') }}</div>
         <div class="text-lg font-medium text-white">
           {{ formatBytes(totalTraffic) }}
         </div>
@@ -74,7 +74,7 @@
           @click="toggleConnection"
         >
           <Icon :name="isConnected ? 'heroicons:stop' : 'heroicons:play'" class="w-4 h-4 mr-2" />
-          {{ isConnected ? '断开' : '连接' }}
+          {{ isConnected ? $t('common.disconnect') : $t('common.connect') }}
         </UButton>
         
         <UButton
@@ -84,13 +84,13 @@
           class="border-white/20 text-white hover:bg-white/10"
         >
           <Icon name="heroicons:server" class="w-4 h-4 mr-2" />
-          切换服务器
+          {{ $t('minimalMode.switchServer') }}
         </UButton>
       </div>
       
       <!-- 代理模式切换 -->
       <div class="mt-4">
-        <div class="text-sm text-gray-300 mb-2">代理模式</div>
+        <div class="text-sm text-gray-300 mb-2">{{ $t('minimalMode.proxyMode') }}</div>
         <div class="grid grid-cols-3 gap-2">
           <UButton
             v-for="mode in proxyModes"
@@ -113,7 +113,7 @@
         <template #header>
           <div class="flex items-center space-x-2">
             <Icon name="heroicons:server" class="w-5 h-5 text-green-500" />
-            <span>选择服务器</span>
+            <span>{{ $t('minimalMode.selectServer') }}</span>
           </div>
         </template>
         
@@ -156,7 +156,7 @@
         <template #footer>
           <div class="flex justify-end">
             <UButton variant="ghost" @click="showServerList = false">
-              关闭
+              {{ $t('common.close') }}
             </UButton>
           </div>
         </template>
@@ -167,6 +167,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+// 国际化
+const { t: $t } = useI18n()
 
 // 获取应用配置以访问主题色
 const appConfig = useAppConfig()
@@ -208,7 +212,7 @@ const currentServerId = ref<string | null>(null)
 const servers = ref<Server[]>([
   {
     id: '1',
-    name: '示例服务器 1',
+    name: $t('minimalMode.exampleServer1'),
     address: 'example1.com',
     port: 443,
     protocol: 'vmess',
@@ -216,7 +220,7 @@ const servers = ref<Server[]>([
   },
   {
     id: '2',
-    name: '示例服务器 2',
+    name: $t('minimalMode.exampleServer2'),
     address: 'example2.com',
     port: 443,
     protocol: 'vless',
@@ -224,16 +228,16 @@ const servers = ref<Server[]>([
   }
 ])
 
-const proxyModes = [
-  { label: '直连', value: 'direct' },
-  { label: '全局', value: 'global' },
-  { label: 'PAC', value: 'pac' }
-]
+const proxyModes = computed(() => [
+  { label: $t('minimalMode.proxyModes.direct'), value: 'direct' },
+  { label: $t('minimalMode.proxyModes.global'), value: 'global' },
+  { label: $t('minimalMode.proxyModes.pac'), value: 'pac' }
+])
 
 // 计算属性
 const statusText = computed(() => {
-  if (props.isConnected) return '已连接'
-  return '未连接'
+  if (props.isConnected) return $t('common.connected')
+  return $t('common.disconnected')
 })
 
 // 方法

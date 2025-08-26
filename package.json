@@ -16,6 +16,7 @@
   "dependencies": {
     "@fontsource/noto-sans-sc": "^5.2.6",
     "@nuxt/ui": "^2.18.7",
+    "@nuxtjs/i18n": "^10.0.6",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-fs": "^2",

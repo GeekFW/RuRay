@@ -346,6 +346,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::clear_log_file,
             // 文件系统操作
             commands::open_file_directory,
+            // 语言配置
+            commands::update_language_config,
+            commands::get_language_config,
         ])
         .setup(|app| {
             // 初始化应用配置

@@ -310,7 +310,7 @@ impl TunManager {
     pub async fn start(&self, config: TunConfig) -> Result<()> {
         // 检查管理员权限
         if !Self::is_admin() {
-            return Err(anyhow::anyhow!("启动TUN模式需要管理员权限，请以管理员身份运行程序"));
+            return Err(anyhow::anyhow!("TUN_ERROR_ADMIN"));
         }
 
         // 检查代理服务器是否正在运行并获取代理地址
@@ -324,7 +324,7 @@ impl TunManager {
                 socks_url
             }
             None => {
-                return Err(anyhow::anyhow!("无法启动TUN模式：没有正在运行的代理服务器。请先启动代理服务器。"));
+                return Err(anyhow::anyhow!("TUN_ERROR_NO_PROXY"));
             }
         };
 

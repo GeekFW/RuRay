@@ -3,7 +3,7 @@
     <!-- 头部 -->
     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">TUN配置</h2>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $t('tunConfig.title') }}</h2>
         <UButton
           size="sm"
           @click="resetToDefault"
@@ -11,7 +11,7 @@
           variant="outline"
         >
           <Icon name="heroicons:arrow-path" class="w-4 h-4 mr-1" />
-          重置默认
+          {{ $t('common.resetDefault') }}
         </UButton>
       </div>
       
@@ -25,9 +25,9 @@
               class="w-5 h-5"
             />
             <div>
-              <h3 class="text-sm font-medium text-gray-900 dark:text-white">TUN设备状态</h3>
+              <h3 class="text-sm font-medium text-gray-900 dark:text-white">{{ $t('tunConfig.deviceStatus') }}</h3>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ tunStatus.is_running ? '运行中' : '未运行' }}
+                {{ tunStatus.is_running ? $t('common.running') : $t('common.notRunning') }}
                 <span v-if="tunStatus.is_running && tunStatus.device_name">
                   - {{ tunStatus.device_name }}
                 </span>
@@ -43,7 +43,7 @@
               variant="soft"
               size="xs"
             >
-              {{ tunStatus.is_running ? '运行' : '停止' }}
+              {{ tunStatus.is_running ? $t('common.running') : $t('common.stopped') }}
             </UBadge>
             <UButton
               icon="i-heroicons-arrow-path"
@@ -64,12 +64,12 @@
         <!-- 基础配置 -->
         <UCard>
           <template #header>
-            <h3 class="text-base font-semibold text-gray-900 dark:text-white">基础配置</h3>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ $t('tunConfig.basicConfig') }}</h3>
           </template>
           
           <div class="space-y-4">
             <!-- 设备名称 -->
-            <UFormGroup label="设备名称" name="name" help="TUN虚拟网卡的名称">
+            <UFormGroup :label="$t('tunConfig.deviceName')" name="name" :help="$t('tunConfig.deviceNameHelp')">
               <UInput
                 v-model="tunConfig.name"
                 placeholder="ruray-tun"
@@ -78,7 +78,7 @@
             </UFormGroup>
             
             <!-- IP地址 -->
-            <UFormGroup label="IP地址" name="address" help="TUN设备的IP地址" required>
+            <UFormGroup :label="$t('tunConfig.ipAddress')" name="address" :help="$t('tunConfig.ipAddressHelp')" required>
               <UInput
                 v-model="tunConfig.address"
                 placeholder="192.168.55.10"
@@ -92,7 +92,7 @@
             </UFormGroup>
             
             <!-- 子网掩码 -->
-            <UFormGroup label="子网掩码" name="netmask" help="TUN设备的子网掩码" required>
+            <UFormGroup :label="$t('tunConfig.netmask')" name="netmask" :help="$t('tunConfig.netmaskHelp')" required>
               <UInput
                 v-model="tunConfig.netmask"
                 placeholder="255.255.255.0"
@@ -106,7 +106,7 @@
             </UFormGroup>
             
             <!-- MTU大小 -->
-            <UFormGroup label="MTU大小" name="mtu" help="最大传输单元大小">
+            <UFormGroup :label="$t('tunConfig.mtuSize')" name="mtu" :help="$t('tunConfig.mtuSizeHelp')">
               <UInput
                 v-model.number="tunConfig.mtu"
                 type="number"
@@ -122,12 +122,12 @@
         <!-- 路由配置 -->
         <UCard>
           <template #header>
-            <h3 class="text-base font-semibold text-gray-900 dark:text-white">路由配置</h3>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ $t('tunConfig.routeConfig') }}</h3>
           </template>
           
           <div class="space-y-4">
             <!-- 网关地址 -->
-            <UFormGroup label="网关地址" name="gateway" help="默认路由的网关地址">
+            <UFormGroup :label="$t('tunConfig.gatewayAddress')" name="gateway" :help="$t('tunConfig.gatewayAddressHelp')">
               <UInput
                 v-model="tunConfig.gateway"
                 placeholder="192.168.55.1"
@@ -141,7 +141,7 @@
             </UFormGroup>
             
             <!-- 路由优先级 -->
-            <UFormGroup label="路由优先级" name="metric" help="路由表中的优先级，数值越小优先级越高">
+            <UFormGroup :label="$t('tunConfig.routePriority')" name="metric" :help="$t('tunConfig.routePriorityHelp')">
               <UInput
                 v-model.number="tunConfig.metric"
                 type="number"
@@ -163,7 +163,7 @@
             @click="loadTunConfig"
             :disabled="configLoading"
           >
-            重新加载
+            {{ $t('common.reload') }}
           </UButton>
           <UButton
             type="submit"
@@ -171,7 +171,7 @@
             :loading="configLoading"
             :disabled="tunStatus.is_running || !isConfigValid"
           >
-            保存配置
+            {{ $t('common.saveConfig') }}
           </UButton>
         </div>
       </UForm>
@@ -182,6 +182,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useI18n } from 'vue-i18n'
+
+// 国际化
+const { t: $t } = useI18n()
 
 // 获取应用配置以访问主题色
 const appConfig = useAppConfig()
@@ -246,9 +250,9 @@ const gatewayError = ref('')
 const validateIpAddress = () => {
   const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
   if (!tunConfig.address) {
-    addressError.value = 'IP地址不能为空'
+    addressError.value = $t('tunConfig.validation.ipAddressRequired')
   } else if (!ipRegex.test(tunConfig.address)) {
-    addressError.value = '请输入有效的IP地址'
+    addressError.value = $t('tunConfig.validation.invalidIpAddress')
   } else {
     addressError.value = ''
   }
@@ -260,9 +264,9 @@ const validateIpAddress = () => {
 const validateNetmask = () => {
   const netmaskRegex = /^(?:(?:255\.){3}(?:255|254|252|248|240|224|192|128|0))|(?:(?:255\.){2}(?:255|254|252|248|240|224|192|128|0)\.0)|(?:(?:255\.){1}(?:255|254|252|248|240|224|192|128|0)\.0\.0)|(?:(?:255|254|252|248|240|224|192|128|0)\.0\.0\.0)$/
   if (!tunConfig.netmask) {
-    netmaskError.value = '子网掩码不能为空'
+    netmaskError.value = $t('tunConfig.validation.netmaskRequired')
   } else if (!netmaskRegex.test(tunConfig.netmask)) {
-    netmaskError.value = '请输入有效的子网掩码'
+    netmaskError.value = $t('tunConfig.validation.invalidNetmask')
   } else {
     netmaskError.value = ''
   }
@@ -274,9 +278,9 @@ const validateNetmask = () => {
 const validateGateway = () => {
   const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
   if (!tunConfig.gateway) {
-    gatewayError.value = '网关地址不能为空'
+    gatewayError.value = $t('tunConfig.validation.gatewayRequired')
   } else if (!ipRegex.test(tunConfig.gateway)) {
-    gatewayError.value = '请输入有效的网关地址'
+    gatewayError.value = $t('tunConfig.validation.invalidGateway')
   } else {
     gatewayError.value = ''
   }
@@ -303,11 +307,11 @@ const loadTunConfig = async () => {
     const config = await invoke('get_tun_config') as TunConfig
     Object.assign(tunConfig, config)
   } catch (error) {
-    console.error('加载TUN配置失败:', error)
+    console.error($t('tunConfig.loadConfigFailed'), error)
     const toast = useToast()
     toast.add({
-      title: '加载失败',
-      description: `无法加载TUN配置: ${error}`,
+      title: $t('common.loadFailed'),
+      description: `${$t('tunConfig.loadConfigFailedDesc')}: ${error}`,
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -328,8 +332,8 @@ const saveTunConfig = async () => {
   if (!isConfigValid.value) {
     const toast = useToast()
     toast.add({
-      title: '配置无效',
-      description: '请检查并修正配置错误',
+      title: $t('tunConfig.invalidConfig'),
+      description: $t('tunConfig.invalidConfigDesc'),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'orange'
     })
@@ -342,17 +346,17 @@ const saveTunConfig = async () => {
     
     const toast = useToast()
     toast.add({
-      title: '保存成功',
-      description: 'TUN配置已保存',
+      title: $t('common.saveSuccess'),
+      description: $t('tunConfig.configSaved'),
       icon: 'i-heroicons-check-circle',
       color: 'green'
     })
   } catch (error) {
-    console.error('保存TUN配置失败:', error)
+    console.error($t('tunConfig.saveConfigFailed'), error)
     const toast = useToast()
     toast.add({
-      title: '保存失败',
-      description: `无法保存TUN配置: ${error}`,
+      title: $t('common.saveFailed'),
+      description: `${$t('tunConfig.saveConfigFailedDesc')}: ${error}`,
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -370,7 +374,7 @@ const refreshTunStatus = async () => {
     const status = await invoke('get_tun_status') as TunStatus
     Object.assign(tunStatus, status)
   } catch (error) {
-    console.error('获取TUN状态失败:', error)
+    console.error($t('tunConfig.getTunStatusFailed'), error)
   } finally {
     statusLoading.value = false
   }

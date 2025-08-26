@@ -15,7 +15,7 @@ CreateAt: 2024-12-19
           </div>
           <div>
             <h2 class="text-xl font-bold text-white">RuRay</h2>
-            <p class="text-xs text-gray-400">极简模式</p>
+            <p class="text-xs text-gray-400">{{ t('zen.zenMode') }}</p>
           </div>
         </div>
         
@@ -49,7 +49,7 @@ CreateAt: 2024-12-19
         </div>
         
         <h3 class="text-2xl font-bold text-white mb-2">
-          {{ isConnected ? '已连接' : '未连接' }}
+          {{ isConnected ? t('common.connected') : t('common.disconnected') }}
         </h3>
         
         <div v-if="activeServer" class="text-gray-300">
@@ -70,7 +70,7 @@ CreateAt: 2024-12-19
         <div class="text-center">
           <div class="flex items-center justify-center space-x-2 mb-2">
             <Icon name="heroicons:arrow-up" class="w-5 h-5 text-green-400" />
-            <span class="text-sm text-gray-300 font-medium">上传</span>
+            <span class="text-sm text-gray-300 font-medium">{{ t('common.upload') }}</span>
           </div>
           <div class="text-2xl font-bold text-green-400 font-mono">
             {{ formatSpeed(uploadSpeed) }}
@@ -80,7 +80,7 @@ CreateAt: 2024-12-19
         <div class="text-center">
           <div class="flex items-center justify-center space-x-2 mb-2">
             <Icon name="heroicons:arrow-down" class="w-5 h-5 text-blue-400" />
-            <span class="text-sm text-gray-300 font-medium">下载</span>
+            <span class="text-sm text-gray-300 font-medium">{{ t('common.download') }}</span>
           </div>
           <div class="text-2xl font-bold text-blue-400 font-mono">
             {{ formatSpeed(downloadSpeed) }}
@@ -92,21 +92,21 @@ CreateAt: 2024-12-19
       <div class="bg-white/5 rounded-xl p-4 mb-6">
         <div class="grid grid-cols-2 gap-4 mb-4">
           <div class="text-center">
-            <p class="text-xs text-gray-400 mb-1">会话流量</p>
+            <p class="text-xs text-gray-400 mb-1">{{ t('zen.sessionTraffic') }}</p>
             <p class="text-lg font-bold text-blue-400">{{ formatBytes(sessionTraffic) }}</p>
           </div>
           <div class="text-center">
-            <p class="text-xs text-gray-400 mb-1">总流量</p>
+            <p class="text-xs text-gray-400 mb-1">{{ t('common.totalTraffic') }}</p>
             <p class="text-lg font-bold text-white">{{ formatBytes(totalTraffic) }}</p>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-4 text-center">
           <div>
-            <p class="text-xs text-gray-400 mb-1">运行时间</p>
+            <p class="text-xs text-gray-400 mb-1">{{ t('common.uptime') }}</p>
             <p class="text-lg font-bold text-white">{{ formatDuration(uptime) }}</p>
           </div>
           <div>
-            <p class="text-xs text-gray-400 mb-1">代理模式</p>
+            <p class="text-xs text-gray-400 mb-1">{{ t('common.proxyMode') }}</p>
             <UBadge 
               :color="getProxyModeColor(proxyMode)" 
               variant="soft" 
@@ -133,7 +133,7 @@ CreateAt: 2024-12-19
             :name="isConnected ? 'heroicons:stop' : 'heroicons:play'" 
             class="w-5 h-5 mr-2" 
           />
-          {{ isConnected ? '断开连接' : '开始连接' }}
+          {{ isConnected ? t('common.disconnect') : t('common.connect') }}
         </UButton>
         
         <UButton
@@ -144,7 +144,7 @@ CreateAt: 2024-12-19
           class="border-white/20 text-white hover:bg-white/10 font-medium"
         >
           <Icon name="heroicons:arrow-path" class="w-5 h-5 mr-2" />
-          切换服务器
+          {{ t('common.switchServer') }}
         </UButton>
       </div>
     </div>
@@ -152,6 +152,9 @@ CreateAt: 2024-12-19
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 /**
  * 服务器接口定义
@@ -283,10 +286,10 @@ const getProxyModeColor = (mode: string): string => {
  */
 const getProxyModeText = (mode: string): string => {
   switch (mode) {
-    case 'global': return '全局'
-    case 'pac': return 'PAC'
-    case 'direct': return '直连'
-    default: return '未知'
+    case 'global': return $t('common.global')
+    case 'pac': return $t('common.pac')
+    case 'direct': return $t('common.direct')
+    default: return $t('common.unknown')
   }
 }
 </script>
@@ -297,9 +300,6 @@ const getProxyModeText = (mode: string): string => {
 }
 
 /* 数字字体优化 */
-.font-mono {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-}
 
 /* 动画效果 */
 @keyframes pulse-glow {

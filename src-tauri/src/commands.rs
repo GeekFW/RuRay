@@ -952,3 +952,30 @@ pub async fn open_file_directory(file_path: String) -> Result<(), String> {
     log_info!("已打开目录: {:?}", dir_path);
     Ok(())
 }
+
+/// 更新语言配置
+/// 
+/// # 参数
+/// * `language` - 语言代码 (如: "en", "zh", "ja")
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 更新结果
+#[tauri::command]
+pub async fn update_language_config(language: String) -> Result<(), String> {
+    let mut config = AppConfig::load().map_err(|e| e.to_string())?;
+    config.language = language.clone();
+    config.save().map_err(|e| e.to_string())?;
+    
+    log_info!("语言配置已更新为: {}", language);
+    Ok(())
+}
+
+/// 获取当前语言配置
+/// 
+/// # 返回值
+/// * `Result<String, String>` - 当前语言代码
+#[tauri::command]
+pub async fn get_language_config() -> Result<String, String> {
+    let config = AppConfig::load().map_err(|e| e.to_string())?;
+    Ok(config.language)
+}

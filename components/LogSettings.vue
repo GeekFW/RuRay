@@ -3,7 +3,7 @@
     <!-- 头部 -->
     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">日志设置</h2>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $t('logSettings.title') }}</h2>
         <UButton
           size="sm"
           @click="refreshLogInfo"
@@ -12,7 +12,7 @@
           :loading="loading"
         >
           <Icon name="heroicons:arrow-path" class="w-4 h-4 mr-1" />
-          刷新
+          {{ $t('common.refresh') }}
         </UButton>
       </div>
     </div>
@@ -23,18 +23,18 @@
         <!-- 日志文件信息 -->
         <UCard>
           <template #header>
-            <h3 class="text-base font-semibold text-gray-900 dark:text-white">日志文件信息</h3>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ $t('logSettings.fileInfo.title') }}</h3>
           </template>
           
           <div class="space-y-4">
             <!-- 日志文件路径 -->
-            <UFormGroup label="日志文件路径" name="logPath" help="当前日志文件的存储路径">
+            <UFormGroup :label="$t('logSettings.fileInfo.logPath')" name="logPath" :help="$t('logSettings.fileInfo.logPathHelp')">
               <div class="flex items-center space-x-2">
                 <UInput
                   v-model="logPath"
                   readonly
                   class="flex-1"
-                  placeholder="获取中..."
+                  :placeholder="$t('logSettings.fileInfo.loading')"
                 />
                 <UButton
                   size="sm"
@@ -44,26 +44,26 @@
                   :disabled="!logPath"
                 >
                   <Icon name="heroicons:folder-open" class="w-4 h-4 mr-1" />
-                  浏览
+                  {{ $t('common.browse') }}
                 </UButton>
               </div>
             </UFormGroup>
             
             <!-- 日志文件大小 -->
-            <UFormGroup label="文件大小" name="logSize" help="当前日志文件的大小">
+            <UFormGroup :label="$t('logSettings.fileInfo.fileSize')" name="logSize" :help="$t('logSettings.fileInfo.fileSizeHelp')">
               <UInput
                 v-model="logSizeDisplay"
                 readonly
-                placeholder="计算中..."
+                :placeholder="$t('logSettings.fileInfo.calculating')"
               />
             </UFormGroup>
             
             <!-- 日志条目数量 -->
-            <UFormGroup label="日志条目" name="logCount" help="当前日志文件中的条目数量">
+            <UFormGroup :label="$t('logSettings.fileInfo.logCount')" name="logCount" :help="$t('logSettings.fileInfo.logCountHelp')">
               <UInput
                 v-model="logCountDisplay"
                 readonly
-                placeholder="统计中..."
+                :placeholder="$t('logSettings.fileInfo.counting')"
               />
             </UFormGroup>
           </div>
@@ -72,16 +72,16 @@
         <!-- 日志管理操作 -->
         <UCard>
           <template #header>
-            <h3 class="text-base font-semibold text-gray-900 dark:text-white">日志管理</h3>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ $t('logSettings.management.title') }}</h3>
           </template>
           
           <div class="space-y-4">
             <!-- 清理日志 -->
             <div class="flex items-center justify-between p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
               <div>
-                <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">清理日志文件</h4>
+                <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">{{ $t('logSettings.management.clearTitle') }}</h4>
                 <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                  清空现有的日志内容，不影响后续日志写入
+                  {{ $t('logSettings.management.clearDesc') }}
                 </p>
               </div>
               <UButton
@@ -92,16 +92,16 @@
                 :disabled="!logPath || logSize === 0"
               >
                 <Icon name="heroicons:trash" class="w-4 h-4 mr-1" />
-                清理日志
+                {{ $t('logSettings.management.clearButton') }}
               </UButton>
             </div>
             
             <!-- 导出日志 -->
             <div class="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <div>
-                <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200">导出日志文件</h4>
+                <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200">{{ $t('logSettings.management.exportTitle') }}</h4>
                 <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  将当前日志文件导出到指定位置
+                  {{ $t('logSettings.management.exportDesc') }}
                 </p>
               </div>
               <UButton
@@ -113,7 +113,7 @@
                 :loading="exporting"
               >
                 <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 mr-1" />
-                导出日志
+                {{ $t('logSettings.management.exportButton') }}
               </UButton>
             </div>
           </div>
@@ -125,25 +125,25 @@
     <UModal v-model="showClearConfirm">
       <UCard>
         <template #header>
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">确认清理日志</h3>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $t('logSettings.confirmClear.title') }}</h3>
         </template>
         
         <div class="space-y-4">
           <div class="flex items-start space-x-3">
             <Icon name="heroicons:exclamation-triangle" class="w-6 h-6 text-yellow-500 flex-shrink-0 mt-0.5" />
             <div>
-              <p class="text-gray-900 dark:text-white font-medium">您确定要清理日志文件吗？</p>
+              <p class="text-gray-900 dark:text-white font-medium">{{ $t('logSettings.confirmClear.question') }}</p>
               <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                此操作将清空所有现有的日志内容，但不会影响后续的日志写入。此操作不可撤销。
+                {{ $t('logSettings.confirmClear.warning') }}
               </p>
             </div>
           </div>
           
           <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
             <div class="text-sm text-gray-600 dark:text-gray-400">
-              <p><strong>文件路径：</strong>{{ logPath }}</p>
-              <p><strong>当前大小：</strong>{{ logSizeDisplay }}</p>
-              <p><strong>日志条目：</strong>{{ logCountDisplay }}</p>
+              <p><strong>{{ $t('logSettings.confirmClear.filePath') }}：</strong>{{ logPath }}</p>
+              <p><strong>{{ $t('logSettings.confirmClear.currentSize') }}：</strong>{{ logSizeDisplay }}</p>
+              <p><strong>{{ $t('logSettings.confirmClear.logEntries') }}：</strong>{{ logCountDisplay }}</p>
             </div>
           </div>
         </div>
@@ -155,14 +155,14 @@
               @click="showClearConfirm = false"
               :disabled="clearing"
             >
-              取消
+              {{ $t('common.cancel') }}
             </UButton>
             <UButton
               :color="selectedThemeColor"
               @click="clearLogFile"
               :loading="clearing"
             >
-              确认清理
+              {{ $t('logSettings.confirmClear.confirmButton') }}
             </UButton>
           </div>
         </template>
@@ -176,6 +176,10 @@ import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { copyFile } from '@tauri-apps/plugin-fs'
+import { useI18n } from 'vue-i18n'
+
+// 国际化
+const { t: $t } = useI18n()
 
 // Toast 通知
 const toast = useToast()
@@ -211,7 +215,7 @@ const logSizeDisplay = computed(() => {
 })
 
 const logCountDisplay = computed(() => {
-  return logCount.value.toLocaleString() + ' 条'
+  return logCount.value.toLocaleString() + ' ' + $t('logSettings.fileInfo.entries')
 })
 
 // 方法
@@ -232,8 +236,8 @@ const getLogInfo = async () => {
   } catch (error) {
     console.error('获取日志信息失败:', error)
     toast.add({
-      title: '获取日志信息失败',
-      description: error instanceof Error ? error.message : '未知错误',
+      title: $t('logSettings.messages.getInfoFailed'),
+      description: error instanceof Error ? error.message : $t('common.unknownError'),
       color: 'red'
     })
   }
@@ -247,8 +251,8 @@ const refreshLogInfo = async () => {
   try {
     await getLogInfo()
     toast.add({
-      title: '刷新成功',
-      description: '日志信息已更新',
+      title: $t('logSettings.messages.refreshSuccess'),
+      description: $t('logSettings.messages.refreshSuccessDesc'),
       color: 'green'
     })
   } finally {
@@ -270,8 +274,8 @@ const openLogDirectory = async () => {
   } catch (error) {
     console.error('打开目录失败:', error)
     toast.add({
-      title: '打开目录失败',
-      description: error instanceof Error ? error.message : '未知错误',
+      title: $t('logSettings.messages.openDirFailed'),
+      description: error instanceof Error ? error.message : $t('common.unknownError'),
       color: 'red'
     })
   }
@@ -290,15 +294,15 @@ const clearLogFile = async () => {
     
     showClearConfirm.value = false
     toast.add({
-      title: '清理成功',
-      description: '日志文件已清空',
+      title: $t('logSettings.messages.clearSuccess'),
+      description: $t('logSettings.messages.clearSuccessDesc'),
       color: 'green'
     })
   } catch (error) {
     console.error('清理日志失败:', error)
     toast.add({
-      title: '清理日志失败',
-      description: error instanceof Error ? error.message : '未知错误',
+      title: $t('logSettings.messages.clearFailed'),
+      description: error instanceof Error ? error.message : $t('common.unknownError'),
       color: 'red'
     })
   } finally {
@@ -328,16 +332,16 @@ const exportLogFile = async () => {
       await copyFile(logPath.value, savePath)
       
       toast.add({
-        title: '导出成功',
-        description: `日志文件已保存到: ${savePath}`,
+        title: $t('logSettings.messages.exportSuccess'),
+        description: $t('logSettings.messages.exportSuccessDesc', { path: savePath }),
         color: 'green'
       })
     }
   } catch (error) {
     console.error('导出日志失败:', error)
     toast.add({
-      title: '导出日志失败',
-      description: error instanceof Error ? error.message : '未知错误',
+      title: $t('logSettings.messages.exportFailed'),
+      description: error instanceof Error ? error.message : $t('common.unknownError'),
       color: 'red'
     })
   } finally {

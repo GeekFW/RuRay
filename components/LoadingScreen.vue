@@ -44,16 +44,20 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+// 国际化
+const { t: $t } = useI18n()
 
 const progress = ref(0)
-const loadingText = ref('正在初始化...')
+const loadingText = ref($t('loadingScreen.initializing'))
 
 const loadingSteps = [
-  { text: '正在初始化...', duration: 500 },
-  { text: '检查 Xray Core...', duration: 400 },
-  { text: '加载配置文件...', duration: 300 },
-  { text: '准备用户界面...', duration: 400 },
-  { text: '启动完成', duration: 400 }
+  { text: $t('loadingScreen.initializing'), duration: 500 },
+  { text: $t('loadingScreen.checkingXrayCore'), duration: 400 },
+  { text: $t('loadingScreen.loadingConfig'), duration: 300 },
+  { text: $t('loadingScreen.preparingUI'), duration: 400 },
+  { text: $t('loadingScreen.startupComplete'), duration: 400 }
 ]
 
 onMounted(() => {

@@ -1,5 +1,5 @@
 <template>
-  <div class="h-8 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 text-xs">
+  <div class="h-8 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 text-xs select-none">
     <!-- 左侧状态信息 -->
     <div class="flex items-center space-x-6">
       <!-- 代理状态 -->
@@ -77,7 +77,7 @@
       <div class="flex items-center space-x-2">
         <Icon name="heroicons:circle-stack" class="w-3 h-3 text-gray-500" />
         <span class="text-gray-600 dark:text-gray-400">
-          内存: {{ formatBytes(memoryUsage) }}
+          {{ $t('statusBar.memory') }}: {{ formatBytes(memoryUsage) }}
         </span>
       </div>
       
@@ -95,6 +95,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useI18n } from 'vue-i18n'
+import { getTunErrorI18nKey } from '~/utils/errors'
+
+// 国际化
+const { t: $t } = useI18n()
 
 // Toast 通知
 const toast = useToast()
@@ -156,24 +161,24 @@ let updateInterval: NodeJS.Timeout | null = null
 // 计算属性
 const proxyStatusText = computed(() => {
   const statusMap = {
-    connected: '已连接',
-    connecting: '连接中',
-    disconnected: '未连接'
+    connected: $t('common.connected'),
+    connecting: $t('common.connecting'),
+    disconnected: $t('common.disconnected')
   }
   return statusMap[proxyStatus.value]
 })
 
 const proxyModeText = computed(() => {
   const modeMap = {
-    direct: '直连模式',
-    global: '全局代理',
-    pac: 'PAC 模式'
+    direct: $t('statusBar.proxyModes.direct'),
+    global: $t('statusBar.proxyModes.global'),
+    pac: $t('statusBar.proxyModes.pac')
   }
   return modeMap[proxyMode.value]
 })
 
 const tunModeText = computed(() => {
-  return tunEnabled.value ? 'TUN模式' : '代理模式'
+  return tunEnabled.value ? $t('statusBar.tunMode') : $t('statusBar.proxyMode')
 })
 
 const uptime = computed(() => {
@@ -242,7 +247,7 @@ const updateSystemStats = async () => {
         tunStatus.value = await invoke('get_tun_status')
       }
     } catch (error) {
-      console.warn('获取TUN状态失败:', error)
+      console.warn($t('statusBar.getTunStatusFailed'), error)
     }
     
     // 获取代理状态信息
@@ -276,7 +281,7 @@ const updateSystemStats = async () => {
     proxyMode.value = modeMap[proxyStatusData.proxy_mode] || 'direct'
     
   } catch (error) {
-    console.error('更新系统统计失败:', error)
+    console.error($t('statusBar.updateSystemStatsFailed'), error)
     
     // 如果API调用失败，使用默认值
     cpuUsage.value = 0
@@ -322,7 +327,7 @@ onMounted(async () => {
       unlisten()
     })
   } catch (error) {
-    console.warn('监听代理模式变化事件失败:', error)
+    console.warn($t('statusBar.listenProxyModeChangeFailed'), error)
   }
 })
 
@@ -355,28 +360,31 @@ const toggleTunMode = async () => {
     // 显示状态提示
     if (newState) {
       toast.add({
-        title: 'TUN模式已启用',
-        description: '虚拟网卡已成功启动',
+        title: $t('statusBar.tunModeEnabled'),
+        description: $t('statusBar.tunModeEnabledDesc'),
         icon: 'i-heroicons-globe-alt',
         color: 'green'
       })
     } else {
       toast.add({
-        title: 'TUN模式已禁用',
-        description: '虚拟网卡已停止',
+        title: $t('statusBar.tunModeDisabled'),
+        description: $t('statusBar.tunModeDisabledDesc'),
         icon: 'i-heroicons-globe-alt',
         color: 'gray'
       })
     }
   } catch (error) {
-    console.error('切换TUN模式失败:', error)
+    console.error($t('statusBar.toggleTunModeFailed'), error)
     
-    const errorMessage = typeof error === 'string' ? error : (error as any)?.message || '切换TUN模式失败'
+    const errorMessage = typeof error === 'string' ? error : (error as any)?.message || $t('statusBar.toggleTunModeFailed')
+    
+    // 使用错误映射获取对应的i18n键
+    const errorI18nKey = getTunErrorI18nKey(errorMessage, 'statusBar.toggleTunModeFailed')
     
     // 显示错误通知
     toast.add({
-      title: 'TUN模式切换失败',
-      description: errorMessage,
+      title: $t('statusBar.tunModeToggleFailed'),
+      description: $t(errorI18nKey),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })

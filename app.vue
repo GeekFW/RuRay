@@ -45,6 +45,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useI18n } from 'vue-i18n'
+
+const { $t } = useI18n()
 
 /**
  * 服务器接口定义
@@ -148,8 +151,8 @@ const toggleConnection = async () => {
           
           const toast = useToast()
           toast.add({
-            title: '已连接',
-            description: `当前连接到服务器 "${runningServer.name}"`,
+            title: $t('common.connected'),
+            description: `${$t('common.currentlyConnectedToServer')} "${runningServer.name}"`,
             icon: 'i-heroicons-check-circle',
             color: 'green'
           })
@@ -159,8 +162,8 @@ const toggleConnection = async () => {
       // 没有服务器配置
       const toast = useToast()
       toast.add({
-        title: '无可用服务器',
-        description: '请先添加服务器配置',
+        title: $t('common.noAvailableServers'),
+        description: $t('common.pleaseAddServerConfig'),
         icon: 'i-heroicons-exclamation-triangle',
         color: 'orange'
       })
@@ -175,8 +178,8 @@ const switchServer = async () => {
   if (servers.value.length <= 1) {
     const toast = useToast()
     toast.add({
-      title: '无其他服务器',
-      description: '当前只有一个服务器配置',
+      title: $t('common.noOtherServers'),
+      description: $t('common.onlyOneServerConfig'),
       icon: 'i-heroicons-information-circle',
       color: 'blue'
     })
@@ -231,7 +234,7 @@ const loadServers = async () => {
       updated_at: server.updated_at
     }))
   } catch (error) {
-    console.error('加载服务器列表失败:', error)
+    console.error($t('common.loadServerListFailed'), error)
   }
 }
 
@@ -257,19 +260,19 @@ const startProxy = async (serverId: string) => {
       
       const toast = useToast()
       toast.add({
-        title: '连接成功',
-        description: `已连接到服务器 "${server.name}"`,
+        title: $t('common.connectSuccess'),
+        description: `${$t('common.connectedToServer')} "${server.name}"`,
         icon: 'i-heroicons-check-circle',
         color: 'green'
       })
     }
   } catch (error) {
-    console.error('启动代理失败:', error)
+    console.error($t('common.startProxyFailed'), error)
     
     const toast = useToast()
     toast.add({
-      title: '连接失败',
-      description: `无法连接到服务器: ${error}`,
+      title: $t('common.connectFailed'),
+      description: `${$t('common.cannotConnectToServer')}: ${error}`,
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -299,18 +302,18 @@ const stopProxy = async () => {
     
     const toast = useToast()
     toast.add({
-      title: '已断开连接',
-      description: '代理服务已停止',
+      title: $t('common.disconnected'),
+      description: $t('common.proxyServiceStopped'),
       icon: 'i-heroicons-stop-circle',
       color: 'gray'
     })
   } catch (error) {
-    console.error('停止代理失败:', error)
+    console.error($t('common.stopProxyFailed'), error)
     
     const toast = useToast()
     toast.add({
-      title: '断开失败',
-      description: `无法停止代理服务: ${error}`,
+      title: $t('common.disconnectFailed'),
+      description: `${$t('common.cannotStopProxyService')}: ${error}`,
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -353,11 +356,11 @@ const updateNetworkStats = async () => {
     
   } catch (error) {
     networkMonitoringState.value.errorCount++
-    console.error(`获取网络速度失败 (${networkMonitoringState.value.errorCount}):`, error)
+    console.error(`${$t('common.getNetworkSpeedFailed')} (${networkMonitoringState.value.errorCount}):`, error)
     
     // 如果连续失败超过5次，暂停更新30秒
     if (networkMonitoringState.value.errorCount >= 5) {
-      console.warn('网络统计连续失败，暂停30秒后重试')
+      console.warn($t('common.networkStatsFailedRetry'))
       setTimeout(() => {
         networkMonitoringState.value.errorCount = 0
       }, 30000)
@@ -382,7 +385,7 @@ const startNetworkMonitoring = () => {
   invoke('get_network_speed').then((networkStats: any) => {
     sessionStartTraffic.value = (networkStats.total_upload || 0) + (networkStats.total_download || 0)
   }).catch(error => {
-    console.error('获取初始网络统计失败:', error)
+    console.error($t('common.getInitialNetworkStatsFailed'), error)
     sessionStartTraffic.value = 0
   })
   
@@ -441,19 +444,19 @@ const checkXrayCore = async () => {
       const toast = useToast()
       toast.add({
         id: 'xray-warning',
-        title: 'Xray Core 未找到',
-        description: `在路径 "${xrayPath}" 下未找到 xray-core 可执行文件。请在设置中配置正确的 Xray Core 路径。`,
+        title: $t('common.xrayCoreNotFound'),
+        description: `${$t('common.xrayCoreNotFoundDesc')} "${xrayPath}"${$t('common.xrayCoreNotFoundDesc2')}`,
         icon: 'i-heroicons-exclamation-triangle',
         color: 'orange',
         timeout: 0, // 不自动消失
         actions: [{
-          label: '打开设置',
+          label: $t('common.openSettings'),
           click: () => {
             // TODO: 打开设置对话框
-            console.log('打开设置')
+            console.log($t('common.openSettings'))
           }
         }, {
-          label: '忽略',
+          label: $t('common.ignore'),
           click: () => {
             toast.remove('xray-warning')
           }
@@ -461,7 +464,7 @@ const checkXrayCore = async () => {
       })
     }
   } catch (error) {
-    console.error('检查 Xray Core 失败:', error)
+    console.error($t('common.checkXrayCoreFailed'), error)
   }
 }
 
@@ -475,7 +478,7 @@ const loadProxyMode = async () => {
       appState.proxyMode = config.proxy_mode
     }
   } catch (error) {
-    console.error('加载代理模式失败:', error)
+    console.error($t('common.loadProxyModeFailed'), error)
     // 使用默认值
     appState.proxyMode = 'global'
   }
@@ -515,7 +518,7 @@ const initializeProxyStatus = async () => {
     // 同时加载代理模式
     await loadProxyMode()
   } catch (error) {
-    console.error('获取代理状态失败:', error)
+    console.error($t('common.getProxyStatusFailed'), error)
   }
 }
 
@@ -547,7 +550,7 @@ const handleProxyStatusChange = (event: any) => {
     runningServerId.value = null
   }
   
-  console.log('代理状态已更新:', { is_running, current_server })
+  console.log($t('common.proxyStatusUpdated'), { is_running, current_server })
 }
 
 /**
@@ -556,7 +559,7 @@ const handleProxyStatusChange = (event: any) => {
 const handleProxyModeChange = (event: any) => {
   const { proxy_mode } = event.payload
   appState.proxyMode = proxy_mode
-  console.log('代理模式已更新:', proxy_mode)
+  console.log($t('common.proxyModeUpdated'), proxy_mode)
 }
 
 // 初始化应用
@@ -576,7 +579,7 @@ onMounted(async () => {
     await listen('proxy-status-changed', handleProxyStatusChange)
     await listen('proxy-mode-changed', handleProxyModeChange)
   } catch (error) {
-    console.error('监听代理状态变化失败:', error)
+    console.error($t('common.listenProxyStatusChangeFailed'), error)
   }
   
   // 检查 Xray Core

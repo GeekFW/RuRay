@@ -66,6 +66,11 @@ fn default_theme_color() -> String {
     "green".to_string()
 }
 
+/// 为language字段提供默认值
+fn default_language() -> String {
+    "en".to_string()
+}
+
 fn default_auth_method() -> String {
     "noauth".to_string()
 }
@@ -98,6 +103,8 @@ pub struct AppConfig {
     /// 主题色配置
     #[serde(default = "default_theme_color")]
     pub theme_color: String,
+    /// 界面语言配置
+    #[serde(default = "default_language")]
     pub language: String,
     pub log_level: String,
     /// 日志文件路径配置
@@ -160,7 +167,7 @@ impl Default for AppConfig {
             start_minimized: false,
             theme: "dark".to_string(),
             theme_color: "green".to_string(),
-            language: "zh-CN".to_string(),
+            language: "en".to_string(),
             log_level: "info".to_string(),
             log_path: default_log_path(),
             http_port: 10086,

@@ -3,14 +3,14 @@
     <!-- 头部 -->
     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">服务器列表</h2>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $t('serverList.title') }}</h2>
         <UButton
           size="sm"
           @click="showAddServer = true"
           :color="selectedThemeColor"
         >
           <Icon name="heroicons:plus" class="w-4 h-4 mr-1" />
-          添加
+          {{ $t('common.add') }}
         </UButton>
       </div>
       
@@ -24,9 +24,9 @@
               class="w-5 h-5"
             />
             <div>
-              <h3 class="text-sm font-medium text-gray-900 dark:text-white">系统代理状态</h3>
+              <h3 class="text-sm font-medium text-gray-900 dark:text-white">{{ $t('serverList.systemProxy.title') }}</h3>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ systemProxyStatus.enabled ? '已启用' : '未启用' }}
+                {{ systemProxyStatus.enabled ? $t('serverList.systemProxy.enabled') : $t('serverList.systemProxy.disabled') }}
                 <span v-if="systemProxyStatus.enabled && systemProxyStatus.server">
                   - {{ systemProxyStatus.server }}
                 </span>
@@ -42,7 +42,7 @@
               variant="soft"
               size="xs"
             >
-              {{ systemProxyStatus.enabled ? '启用' : '禁用' }}
+              {{ systemProxyStatus.enabled ? $t('serverList.systemProxy.enabled') : $t('serverList.systemProxy.disabled') }}
             </UBadge>
             <UButton
               icon="i-heroicons-arrow-path"
@@ -58,7 +58,7 @@
       
       <!-- 代理模式切换 -->
       <div class="space-y-2">
-        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">代理模式</label>
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('serverList.proxyMode.title') }}</label>
         <USelectMenu
           v-model="proxyMode"
           value-attribute="value"
@@ -101,7 +101,7 @@
               <!-- 运行状态指示器 -->
               <span v-if="server.id === runningServerId" class="ml-2 inline-flex items-center">
                 <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span class="ml-1 text-xs text-green-600 dark:text-green-400 font-medium">运行中</span>
+                <span class="ml-1 text-xs text-green-600 dark:text-green-400 font-medium">{{ $t('serverList.server.running') }}</span>
               </span>
             </div>
             <UBadge
@@ -133,7 +133,7 @@
               size="xs"
               @click.stop="testConnection(server.id)"
               :loading="server.testing"
-              title="测试连接"
+              :title="$t('serverList.server.testConnection')"
             >
               <Icon name="heroicons:signal" class="w-4 h-4" />
             </UButton>
@@ -144,7 +144,7 @@
               size="xs"
               @click.stop="testConfig(server.id)"
               :loading="server.configTesting"
-              title="测试配置"
+              :title="$t('serverList.server.testConfig')"
             >
               <Icon name="heroicons:cog-6-tooth" class="w-4 h-4" />
             </UButton>
@@ -154,7 +154,7 @@
               variant="ghost"
               size="xs"
               @click.stop="editServer(server)"
-              title="编辑服务器"
+              :title="$t('serverList.server.edit')"
             >
               <Icon name="heroicons:pencil" class="w-4 h-4" />
             </UButton>
@@ -164,7 +164,7 @@
               variant="ghost"
               size="xs"
               @click.stop="openConfigFile(server)"
-              title="打开配置文件"
+              :title="$t('serverList.server.openConfig')"
             >
               <Icon name="heroicons:folder-open" class="w-4 h-4" />
             </UButton>
@@ -175,7 +175,7 @@
               size="xs"
               @click.stop="regenerateConfig(server?.id)"
               :loading="server.regenerating"
-              title="重新生成配置文件"
+              :title="$t('serverList.server.regenerateConfig')"
             >
               <Icon name="heroicons:arrow-path" class="w-4 h-4" />
             </UButton>
@@ -186,7 +186,7 @@
               size="xs"
               color="red"
               @click.stop="deleteServer(server.id)"
-              title="删除服务器"
+              :title="$t('serverList.server.delete')"
             >
               <Icon name="heroicons:trash" class="w-4 h-4" />
             </UButton>
@@ -196,11 +196,11 @@
         <!-- 服务器详情 -->
         <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
           <div class="flex justify-between">
-            <span>地址:</span>
+            <span>{{ $t('serverList.server.address') }}:</span>
             <span class="font-mono">{{ server.address }}:{{ server.port }}</span>
           </div>
           <div v-if="server.ping" class="flex justify-between">
-            <span>延迟:</span>
+            <span>{{ $t('serverList.server.ping') }}:</span>
             <span :class="getPingColor(server.ping)">{{ server.ping }}ms</span>
           </div>
         </div>
@@ -209,10 +209,10 @@
       <!-- 空状态 -->
       <div v-if="servers.length === 0" class="text-center py-12">
         <Icon name="heroicons:server" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p class="text-gray-500 dark:text-gray-400 mb-4">暂无服务器配置</p>
+        <p class="text-gray-500 dark:text-gray-400 mb-4">{{ $t('serverList.empty.message') }}</p>
         <UButton @click="showAddServer = true" :color="selectedThemeColor">
           <Icon name="heroicons:plus" class="w-4 h-4 mr-1" />
-          添加第一个服务器
+          {{ $t('serverList.empty.addFirst') }}
         </UButton>
       </div>
     </div>
@@ -223,16 +223,16 @@
         <template #header>
           <div class="flex items-center space-x-2">
             <Icon name="heroicons:server" class="w-5 h-5 text-green-500" />
-            <span>{{ editingServer ? '编辑服务器' : '添加服务器' }}</span>
+            <span>{{ editingServer ? $t('serverList.dialog.editTitle') : $t('serverList.dialog.addTitle') }}</span>
           </div>
         </template>
         
         <UForm :state="serverForm" @submit="saveServer" class="space-y-4">
-          <UFormGroup label="服务器名称" required>
-            <UInput v-model="serverForm.name" placeholder="输入服务器名称" />
+          <UFormGroup :label="$t('serverList.form.name')" required>
+            <UInput v-model="serverForm.name" :placeholder="$t('serverList.form.namePlaceholder')" />
           </UFormGroup>
           
-          <UFormGroup label="协议类型" required>
+          <UFormGroup :label="$t('serverList.form.protocol')" required>
             <USelectMenu
               v-model="serverForm.protocol"
               value-attribute="value"
@@ -242,23 +242,23 @@
           </UFormGroup>
           
           <div class="grid grid-cols-2 gap-4">
-            <UFormGroup label="服务器地址" required>
+            <UFormGroup :label="$t('serverList.form.address')" required>
               <UInput v-model="serverForm.address" placeholder="example.com" />
             </UFormGroup>
             
-            <UFormGroup label="端口" required>
+            <UFormGroup :label="$t('serverList.form.port')" required>
               <UInput v-model="serverForm.port" type="number" placeholder="443" />
             </UFormGroup>
           </div>
           
           <!-- VMESS/VLESS 配置 -->
           <template v-if="['vmess', 'vless'].includes(serverForm.protocol)">
-            <UFormGroup label="用户 ID" required>
+            <UFormGroup :label="$t('serverList.form.uuid')" required>
               <UInput v-model="serverForm.uuid" placeholder="UUID" />
             </UFormGroup>
             
             <div class="grid grid-cols-2 gap-4">
-              <UFormGroup label="加密方式">
+              <UFormGroup :label="$t('serverList.form.security')">
                 <USelectMenu
                   v-model="serverForm.security"
                   value-attribute="value"
@@ -266,7 +266,7 @@
                 />
               </UFormGroup>
               
-              <UFormGroup label="传输协议">
+              <UFormGroup :label="$t('serverList.form.network')">
                 <USelectMenu
                   v-model="serverForm.network"
                   value-attribute="value"
@@ -275,39 +275,39 @@
               </UFormGroup>
             </div>
             
-            <UFormGroup v-if="serverForm.network === 'ws'" label="WebSocket 路径">
+            <UFormGroup v-if="serverForm.network === 'ws'" :label="$t('serverList.form.wsPath')">
               <UInput v-model="serverForm.path" placeholder="/path" />
             </UFormGroup>
           </template>
           
           <!-- Trojan 配置 -->
           <template v-if="serverForm.protocol === 'trojan'">
-            <UFormGroup label="密码" required>
-              <UInput v-model="serverForm.password" type="password" placeholder="密码" />
+            <UFormGroup :label="$t('serverList.form.password')" required>
+              <UInput v-model="serverForm.password" type="password" :placeholder="$t('serverList.form.password')" />
             </UFormGroup>
             
             <!-- 网络类型 -->
-            <UFormGroup label="网络类型">
+            <UFormGroup :label="$t('serverList.form.network')">
               <USelect v-model="serverForm.network" :options="networkOptions" />
             </UFormGroup>
             
             <!-- WebSocket 路径 -->
-            <UFormGroup v-if="serverForm.network === 'ws'" label="WebSocket 路径">
+            <UFormGroup v-if="serverForm.network === 'ws'" :label="$t('serverList.form.wsPath')">
               <UInput v-model="serverForm.path" placeholder="/path" />
             </UFormGroup>
             
             <!-- HTTP/2 路径 -->
-            <UFormGroup v-if="serverForm.network === 'h2'" label="HTTP/2 路径">
+            <UFormGroup v-if="serverForm.network === 'h2'" :label="$t('serverList.form.h2Path')">
               <UInput v-model="serverForm.path" placeholder="/path" />
             </UFormGroup>
             
             <!-- gRPC 服务名 -->
-            <UFormGroup v-if="serverForm.network === 'grpc'" label="gRPC 服务名">
+            <UFormGroup v-if="serverForm.network === 'grpc'" :label="$t('serverList.form.grpcService')">
               <UInput v-model="serverForm.serviceName" placeholder="serviceName" />
             </UFormGroup>
             
             <!-- Host 头 -->
-            <UFormGroup v-if="['ws', 'h2'].includes(serverForm.network)" label="Host 头">
+            <UFormGroup v-if="['ws', 'h2'].includes(serverForm.network)" :label="$t('serverList.form.host')">
               <UInput v-model="serverForm.host" placeholder="example.com" />
             </UFormGroup>
           </template>
@@ -315,12 +315,12 @@
           <!-- Socks5/HTTP 配置 -->
           <template v-if="['socks5', 'http'].includes(serverForm.protocol)">
             <div class="grid grid-cols-2 gap-4">
-              <UFormGroup label="用户名">
-                <UInput v-model="serverForm.username" placeholder="用户名（可选）" />
+              <UFormGroup :label="$t('serverList.form.username')">
+                <UInput v-model="serverForm.username" :placeholder="$t('serverList.form.usernameOptional')" />
               </UFormGroup>
               
-              <UFormGroup label="密码">
-                <UInput v-model="serverForm.password" type="password" placeholder="密码（可选）" />
+              <UFormGroup :label="$t('serverList.form.password')">
+                <UInput v-model="serverForm.password" type="password" :placeholder="$t('serverList.form.passwordOptional')" />
               </UFormGroup>
             </div>
           </template>
@@ -329,24 +329,24 @@
           <UFormGroup v-if="['vmess', 'vless', 'trojan'].includes(serverForm.protocol)">
             <div class="flex items-center space-x-2">
               <UCheckbox v-model="serverForm.tls" />
-              <label>启用 TLS</label>
+              <label>{{ $t('serverList.form.enableTls') }}</label>
             </div>
           </UFormGroup>
           
           <!-- TLS 高级设置 -->
           <template v-if="serverForm.tls">
-            <UFormGroup label="SNI (Server Name Indication)">
+            <UFormGroup :label="$t('serverList.form.sni')">
               <UInput v-model="serverForm.sni" placeholder="example.com" />
             </UFormGroup>
             
-            <UFormGroup label="ALPN">
+            <UFormGroup :label="$t('serverList.form.alpn')">
               <UInput v-model="serverForm.alpnString" placeholder="h2,http/1.1" />
               <template #help>
-                <span class="text-xs text-gray-500">多个值用逗号分隔，如: h2,http/1.1</span>
+                <span class="text-xs text-gray-500">{{ $t('serverList.form.alpnHelp') }}</span>
               </template>
             </UFormGroup>
             
-            <UFormGroup label="Fingerprint">
+            <UFormGroup :label="$t('serverList.form.fingerprint')">
               <USelect v-model="serverForm.fingerprint" :options="fingerprintOptions" />
             </UFormGroup>
           </template>
@@ -355,7 +355,7 @@
           <UFormGroup v-if="['vmess', 'vless', 'trojan'].includes(serverForm.protocol)">
             <div class="flex items-center space-x-2">
               <UCheckbox v-model="serverForm.mux" />
-              <label>启用 Mux 多路复用</label>
+              <label>{{ $t('serverList.form.enableMux') }}</label>
             </div>
           </UFormGroup>
         </UForm>
@@ -363,10 +363,10 @@
         <template #footer>
           <div class="flex justify-end space-x-2">
             <UButton variant="ghost" @click="cancelEdit">
-              取消
+              {{ $t('common.cancel') }}
             </UButton>
             <UButton @click="saveServer" :color="selectedThemeColor">
-              {{ editingServer ? '保存' : '添加' }}
+              {{ editingServer ? $t('common.save') : $t('common.add') }}
             </UButton>
           </div>
         </template>
@@ -378,9 +378,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useI18n } from 'vue-i18n'
 
 // 全局 composables
 const toast = useToast()
+const { t: $t } = useI18n()
 
 // 获取应用配置以访问主题色
 const appConfig = useAppConfig()
@@ -454,35 +456,35 @@ const serverForm = reactive({
 })
 
 // 选项
-const proxyModeOptions = [
-  { label: '直连模式', value: 'direct' },
-  { label: '全局代理', value: 'global' },
-  { label: 'PAC 模式', value: 'pac' }
-]
+const proxyModeOptions = computed(() => [
+  { label: $t('serverList.proxyMode.direct'), value: 'direct' },
+  { label: $t('serverList.proxyMode.global'), value: 'global' },
+  { label: $t('serverList.proxyMode.pac'), value: 'pac' }
+])
 
-const protocolOptions = [
+const protocolOptions = computed(() => [
   { label: 'VMess', value: 'vmess' },
   { label: 'VLESS', value: 'vless' },
   { label: 'Trojan', value: 'trojan' },
   { label: 'Socks5', value: 'socks5' },
   { label: 'HTTP', value: 'http' }
-]
+])
 
-const securityOptions = [
+const securityOptions = computed(() => [
   { label: 'Auto', value: 'auto' },
   { label: 'AES-128-GCM', value: 'aes-128-gcm' },
   { label: 'ChaCha20-Poly1305', value: 'chacha20-poly1305' },
   { label: 'None', value: 'none' }
-]
+])
 
-const networkOptions = [
+const networkOptions = computed(() => [
   { label: 'TCP', value: 'tcp' },
   { label: 'WebSocket', value: 'ws' },
   { label: 'HTTP/2', value: 'h2' },
   { label: 'gRPC', value: 'grpc' }
-]
+])
 
-const fingerprintOptions = [
+const fingerprintOptions = computed(() => [
   { label: 'Chrome', value: 'chrome' },
   { label: 'Firefox', value: 'firefox' },
   { label: 'Safari', value: 'safari' },
@@ -493,7 +495,7 @@ const fingerprintOptions = [
   { label: 'QQ', value: 'qq' },
   { label: 'Random', value: 'random' },
   { label: 'Randomized', value: 'randomized' }
-]
+])
 
 // 方法
 const getStatusClass = (status: string) => {
@@ -538,15 +540,15 @@ const testConnection = async (serverId: string) => {
     // 显示测试结果通知
     if (result.success) {
       toast.add({
-        title: '连接测试成功',
-        description: `服务器 "${server.name}" 延迟: ${result.ping}ms`,
+        title: $t('serverList.messages.testSuccess'),
+        description: $t('serverList.messages.testSuccessDesc', { name: server.name, ping: result.ping }),
         icon: 'i-heroicons-signal',
         color: 'green'
       })
     } else {
       toast.add({
-        title: '连接测试失败',
-        description: `服务器 "${server.name}" 连接失败`,
+        title: $t('serverList.messages.testFailed'),
+        description: $t('serverList.messages.testFailedDesc', { name: server.name }),
         icon: 'i-heroicons-signal-slash',
         color: 'red'
       })
@@ -556,8 +558,8 @@ const testConnection = async (serverId: string) => {
     
     // 显示错误通知
     toast.add({
-      title: '测试失败',
-      description: `无法测试服务器连接: ${error}`,
+      title: $t('serverList.messages.testError'),
+      description: $t('serverList.messages.testErrorDesc', { error }),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -576,8 +578,8 @@ const testConfig = async (serverId: string) => {
     
     // 显示测试结果通知 - 如果没有抛出异常，说明配置有效
     toast.add({
-      title: '配置测试成功',
-      description: `服务器 "${server.name}" 配置有效`,
+      title: $t('serverList.messages.configTestSuccess'),
+      description: $t('serverList.messages.configTestSuccessDesc', { name: server.name }),
       icon: 'i-heroicons-check-circle',
       color: 'green'
     })
@@ -586,8 +588,8 @@ const testConfig = async (serverId: string) => {
     
     // 显示错误通知
     toast.add({
-      title: '配置测试失败',
-      description: `服务器 "${server.name}" 配置错误: ${error}`,
+      title: $t('serverList.messages.configTestFailed'),
+      description: $t('serverList.messages.configTestFailedDesc', { name: server.name, error }),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -621,8 +623,8 @@ const deleteServer = async (serverId: string) => {
       
       // 显示成功通知
       toast.add({
-        title: '服务器已删除',
-        description: `服务器 "${serverName}" 已成功删除`,
+        title: $t('serverList.messages.serverDeleted'),
+        description: $t('serverList.messages.serverDeletedDesc', { name: serverName }),
         icon: 'i-heroicons-trash',
         color: 'orange'
       })
@@ -632,8 +634,8 @@ const deleteServer = async (serverId: string) => {
     
     // 显示错误通知
     toast.add({
-      title: '删除失败',
-      description: `无法删除服务器: ${error}`,
+      title: $t('serverList.messages.deleteFailed'),
+      description: $t('serverList.messages.deleteFailedDesc', { error }),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -650,8 +652,8 @@ const openConfigFile = async (server: Server) => {
     
     // 显示成功通知
     toast.add({
-      title: '配置文件已打开',
-      description: `已打开服务器 "${server.name}" 的配置文件`,
+      title: $t('serverList.messages.configFileOpened'),
+      description: $t('serverList.messages.configFileOpenedDesc', { name: server.name }),
       icon: 'i-heroicons-folder-open',
       color: 'green'
     })
@@ -660,8 +662,8 @@ const openConfigFile = async (server: Server) => {
     
     // 显示错误通知
     toast.add({
-      title: '打开失败',
-      description: `无法打开配置文件: ${error}`,
+      title: $t('serverList.messages.openFailed'),
+      description: $t('serverList.messages.openFailedDesc', { error }),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -799,8 +801,8 @@ const saveServer = async () => {
       
       // 显示成功通知
       toast.add({
-        title: '服务器已更新',
-        description: `服务器 "${serverForm.name}" 已成功更新`,
+        title: $t('serverList.messages.serverUpdated'),
+        description: $t('serverList.messages.serverUpdatedDesc', { name: serverForm.name }),
         icon: 'i-heroicons-check-circle',
         color: 'green'
       })
@@ -833,8 +835,8 @@ const saveServer = async () => {
       
       // 显示成功通知
       toast.add({
-        title: '服务器已添加',
-        description: `服务器 "${serverForm.name}" 已成功添加`,
+        title: $t('serverList.messages.serverAdded'),
+        description: $t('serverList.messages.serverAddedDesc', { name: serverForm.name }),
         icon: 'i-heroicons-plus-circle',
         color: 'green'
       })
@@ -846,8 +848,8 @@ const saveServer = async () => {
     
     // 显示错误通知
     toast.add({
-      title: '保存失败',
-      description: `无法保存服务器: ${error}`,
+      title: $t('serverList.messages.saveFailed'),
+      description: $t('serverList.messages.saveFailedDesc', { error }),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -908,16 +910,16 @@ const changeProxyMode = async (mode: string) => {
     }
     
     toast.add({
-      title: '代理模式已切换',
-      description: `代理模式已切换至: ${proxyModeOptions.find(opt => opt.value === mode)?.label || mode}`,
+      title: $t('serverList.messages.proxyModeChanged'),
+      description: $t('serverList.messages.proxyModeChangedDesc', { mode: proxyModeOptions.value.find(opt => opt.value === mode)?.label || mode }),
       icon: 'i-heroicons-arrow-path',
       color: 'green'
     })
   } catch (error) {
     console.error('切换代理模式失败:', error)
     toast.add({
-      title: '切换代理模式失败',
-      description: `无法切换代理模式: ${error.message || error}`,
+      title: $t('serverList.messages.proxyModeChangeFailed'),
+      description: $t('serverList.messages.proxyModeChangeFailedDesc', { error: error.message || error }),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -978,9 +980,9 @@ const getActivationButtonColor = (serverId: string) => {
 
 const getActivationButtonTitle = (serverId: string) => {
   if (runningServerId.value === serverId) {
-    return '停止代理'
+    return $t('serverList.server.stopProxy')
   }
-  return '激活服务器'
+  return $t('serverList.server.activateServer')
 }
 
 const toggleServerActivation = async (serverId: string) => {
@@ -1001,8 +1003,8 @@ const toggleServerActivation = async (serverId: string) => {
       
       // 显示成功通知
       toast.add({
-        title: '代理已停止',
-        description: `服务器 "${server.name}" 已停止运行`,
+        title: $t('serverList.messages.proxyStopped'),
+        description: $t('serverList.messages.proxyStoppedDesc', { name: server.name }),
         icon: 'i-heroicons-stop-circle',
         color: 'orange'
       })
@@ -1026,8 +1028,8 @@ const toggleServerActivation = async (serverId: string) => {
       
       // 显示成功通知
       toast.add({
-        title: '代理已启动',
-        description: `服务器 "${server.name}" 已成功启动`,
+        title: $t('serverList.messages.proxyStarted'),
+        description: $t('serverList.messages.proxyStartedDesc', { name: server.name }),
         icon: 'i-heroicons-play-circle',
         color: 'green'
       })
@@ -1037,8 +1039,8 @@ const toggleServerActivation = async (serverId: string) => {
     
     // 显示错误通知
     toast.add({
-      title: '操作失败',
-      description: `无法切换服务器状态: ${error}`,
+      title: $t('serverList.messages.operationFailed'),
+      description: $t('serverList.messages.operationFailedDesc', { error }),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -1061,8 +1063,8 @@ const regenerateConfig = async (serverId: string) => {
     
     // 显示成功通知
     toast.add({
-      title: '配置已刷新',
-      description: `服务器 "${server.name}" 的配置文件已重新生成`,
+      title: $t('serverList.messages.configRefreshed'),
+      description: $t('serverList.messages.configRefreshedDesc', { name: server.name }),
       icon: 'i-heroicons-arrow-path',
       color: 'green'
     })
@@ -1071,8 +1073,8 @@ const regenerateConfig = async (serverId: string) => {
     
     // 显示错误通知
     toast.add({
-      title: '刷新失败',
-      description: `无法重新生成配置文件: ${error}`,
+      title: $t('serverList.messages.refreshFailed'),
+      description: $t('serverList.messages.refreshFailedDesc', { error }),
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -1113,8 +1115,8 @@ const regenerateConfig = async (serverId: string) => {
       
       // 显示错误通知
       toast.add({
-        title: '加载失败',
-        description: `无法加载服务器列表: ${error}`,
+        title: $t('serverList.messages.loadFailed'),
+        description: $t('serverList.messages.loadFailedDesc', { error }),
         icon: 'i-heroicons-exclamation-triangle',
         color: 'red'
       })
@@ -1177,8 +1179,8 @@ const regenerateConfig = async (serverId: string) => {
     } catch (error) {
       console.error('加载代理模式失败:', error)
       toast.add({
-        title: '加载代理模式失败',
-        description: `无法加载当前代理模式设置: ${error.message || error}`,
+        title: $t('serverList.messages.loadProxyModeFailed'),
+        description: $t('serverList.messages.loadProxyModeFailedDesc', { error: error.message || error }),
         icon: 'i-heroicons-exclamation-triangle',
         color: 'red'
       })
@@ -1212,8 +1214,22 @@ const regenerateConfig = async (serverId: string) => {
     try {
       await initializeProxyStatus()
       console.log('服务器状态已刷新')
+      
+      toast.add({
+        title: $t('serverList.messages.statusRefreshed'),
+        description: $t('serverList.messages.statusRefreshedDesc'),
+        icon: 'i-heroicons-arrow-path',
+        color: 'green'
+      })
     } catch (error) {
       console.error('刷新服务器状态失败:', error)
+      
+      toast.add({
+        title: $t('serverList.messages.refreshFailed'),
+        description: $t('serverList.messages.refreshStatusFailedDesc', { error }),
+        icon: 'i-heroicons-exclamation-triangle',
+        color: 'red'
+      })
     }
   }
 
