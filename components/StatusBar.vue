@@ -149,6 +149,7 @@ const totalTraffic = ref(0) // bytes
 const cpuUsage = ref(0) // percentage
 const memoryUsage = ref(0) // bytes
 const startTime = ref(Date.now())
+const currentTime = ref(Date.now()) // 用于触发uptime重新计算
 
 let updateInterval: NodeJS.Timeout | null = null
 
@@ -176,7 +177,8 @@ const tunModeText = computed(() => {
 })
 
 const uptime = computed(() => {
-  const now = Date.now()
+  // 使用currentTime.value来触发响应式更新
+  const now = currentTime.value
   const diff = now - startTime.value
   
   const hours = Math.floor(diff / (1000 * 60 * 60))
@@ -218,6 +220,9 @@ const formatBytes = (bytes: number) => {
 
 const updateSystemStats = async () => {
   try {
+    // 更新当前时间以触发uptime重新计算
+    currentTime.value = Date.now()
+    
     // 获取基础系统统计（CPU、内存）
     const systemStats = await invoke('get_system_stats') as SystemStats
     cpuUsage.value = Math.round(systemStats.cpu_usage)
@@ -280,6 +285,9 @@ const updateSystemStats = async () => {
     downloadSpeed.value = 0
     proxyStatus.value = 'disconnected'
     currentServer.value = null
+    
+    // 即使出错也要更新时间
+    currentTime.value = Date.now()
   }
 }
 

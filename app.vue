@@ -11,7 +11,7 @@
       <!-- 主内容区域 -->
       <div class="flex-1 flex overflow-hidden">
         <!-- 左侧服务器列表 -->
-        <ServerList class="w-100 border-r border-gray-200 dark:border-gray-700" />
+        <ServerList ref="serverListRef" class="w-100 border-r border-gray-200 dark:border-gray-700" />
         
         <!-- 右侧日志区域 -->
         <LogViewer class="flex-1" />
@@ -29,6 +29,7 @@
       :upload-speed="appState.uploadSpeed"
       :download-speed="appState.downloadSpeed"
       :total-traffic="appState.totalTraffic"
+      :session-traffic="appState.sessionTraffic"
       :uptime="appState.uptime"
       :proxy-mode="appState.proxyMode"
       @close="toggleZenMode"
@@ -85,14 +86,36 @@ const appState = reactive({
   uploadSpeed: 0,
   downloadSpeed: 0,
   totalTraffic: 0,
+  sessionTraffic: 0,  // 会话流量（当前连接期间的流量）
   uptime: 0,
   proxyMode: 'global' as 'global' | 'pac' | 'direct'
 })
 
+// 应用启动时间
+const appStartTime = ref<number>(Date.now())
+// 会话开始时的流量基准
+const sessionStartTraffic = ref<number>(0)
+
+// 组件引用
+const serverListRef = ref()
+
 /**
  * 切换极简模式
  */
-const toggleZenMode = () => {
+const toggleZenMode = async () => {
+  if (!isZenMode.value) {
+    // 进入极简模式时，确保状态是最新的
+    // 先加载服务器列表，再初始化代理状态
+    await loadServers()
+    await initializeProxyStatus()
+  } else {
+    // 退出极简模式时，刷新ServerList组件的状态
+    if (serverListRef.value && typeof serverListRef.value.refreshServerStatus === 'function') {
+      await serverListRef.value.refreshServerStatus()
+    }
+    // 同时也要刷新app.vue自己的状态
+    await initializeProxyStatus()
+  }
   isZenMode.value = !isZenMode.value
 }
 
@@ -120,7 +143,16 @@ const toggleConnection = async () => {
         if (runningServer) {
           appState.activeServer = runningServer
           appState.isConnected = true
+          currentServerIndex.value = servers.value.findIndex(s => s.id === runningServerId.value)
           startNetworkMonitoring()
+          
+          const toast = useToast()
+          toast.add({
+            title: '已连接',
+            description: `当前连接到服务器 "${runningServer.name}"`,
+            icon: 'i-heroicons-check-circle',
+            color: 'green'
+          })
         }
       }
     } else {
@@ -167,6 +199,12 @@ const switchServer = async () => {
 // 网络监控定时器
 let networkTimer: NodeJS.Timeout | null = null
 let uptimeTimer: NodeJS.Timeout | null = null
+// 网络监控状态
+const networkMonitoringState = ref({
+  isUpdating: false,
+  errorCount: 0,
+  lastUpdateTime: 0
+})
 
 /**
  * 加载服务器列表
@@ -280,20 +318,86 @@ const stopProxy = async () => {
 }
 
 /**
+ * 更新网络统计数据
+ */
+const updateNetworkStats = async () => {
+  // 防止重复更新
+  if (networkMonitoringState.value.isUpdating) {
+    return
+  }
+  
+  const now = Date.now()
+  // 限制更新频率，最少间隔500ms
+  if (now - networkMonitoringState.value.lastUpdateTime < 500) {
+    return
+  }
+  
+  networkMonitoringState.value.isUpdating = true
+  
+  try {
+    const networkStats = await invoke('get_network_speed') as any
+    
+    // 更新网络速度数据
+    appState.uploadSpeed = networkStats.upload_speed || 0
+    appState.downloadSpeed = networkStats.download_speed || 0
+    
+    // 总流量（从应用启动开始）
+    appState.totalTraffic = (networkStats.total_upload || 0) + (networkStats.total_download || 0)
+    
+    // 会话流量（从当前连接开始）
+    appState.sessionTraffic = Math.max(0, appState.totalTraffic - sessionStartTraffic.value)
+    
+    // 重置错误计数
+    networkMonitoringState.value.errorCount = 0
+    networkMonitoringState.value.lastUpdateTime = now
+    
+  } catch (error) {
+    networkMonitoringState.value.errorCount++
+    console.error(`获取网络速度失败 (${networkMonitoringState.value.errorCount}):`, error)
+    
+    // 如果连续失败超过5次，暂停更新30秒
+    if (networkMonitoringState.value.errorCount >= 5) {
+      console.warn('网络统计连续失败，暂停30秒后重试')
+      setTimeout(() => {
+        networkMonitoringState.value.errorCount = 0
+      }, 30000)
+    }
+  } finally {
+    networkMonitoringState.value.isUpdating = false
+  }
+}
+
+/**
  * 开始网络监控
  */
 const startNetworkMonitoring = () => {
-  // 模拟网络速度数据
+  // 重置监控状态
+  networkMonitoringState.value = {
+    isUpdating: false,
+    errorCount: 0,
+    lastUpdateTime: 0
+  }
+  
+  // 设置会话开始时的流量基准
+  invoke('get_network_speed').then((networkStats: any) => {
+    sessionStartTraffic.value = (networkStats.total_upload || 0) + (networkStats.total_download || 0)
+  }).catch(error => {
+    console.error('获取初始网络统计失败:', error)
+    sessionStartTraffic.value = 0
+  })
+  
+  // 使用优化的网络数据更新
   networkTimer = setInterval(() => {
-    appState.uploadSpeed = Math.random() * 1024 * 1024 // 0-1MB/s
-    appState.downloadSpeed = Math.random() * 10 * 1024 * 1024 // 0-10MB/s
-    appState.totalTraffic += appState.uploadSpeed + appState.downloadSpeed
+    // 如果错误次数过多，跳过此次更新
+    if (networkMonitoringState.value.errorCount < 5) {
+      updateNetworkStats()
+    }
   }, 1000)
   
-  // 运行时间计时器
+  // 运行时间计时器 - 基于应用启动时间计算，降低更新频率
   uptimeTimer = setInterval(() => {
-    appState.uptime += 1
-  }, 1000)
+    appState.uptime = Math.floor((Date.now() - appStartTime.value) / 1000)
+  }, 5000) // 改为5秒更新一次，减少CPU占用
 }
 
 /**
@@ -309,9 +413,19 @@ const stopNetworkMonitoring = () => {
     uptimeTimer = null
   }
   
+  // 重置监控状态
+  networkMonitoringState.value = {
+    isUpdating: false,
+    errorCount: 0,
+    lastUpdateTime: 0
+  }
+  
   appState.uploadSpeed = 0
   appState.downloadSpeed = 0
-  appState.uptime = 0
+  appState.sessionTraffic = 0  // 重置会话流量
+  sessionStartTraffic.value = 0  // 重置会话基准
+  // 保持uptime显示应用总运行时间，不重置为0
+  // 保持totalTraffic显示总累计流量，不重置为0
 }
 
 /**
@@ -352,24 +466,54 @@ const checkXrayCore = async () => {
 }
 
 /**
+ * 加载代理模式
+ */
+const loadProxyMode = async () => {
+  try {
+    const config = await invoke('get_app_config') as any
+    if (config && config.proxy_mode) {
+      appState.proxyMode = config.proxy_mode
+    }
+  } catch (error) {
+    console.error('加载代理模式失败:', error)
+    // 使用默认值
+    appState.proxyMode = 'global'
+  }
+}
+
+/**
  * 初始化代理状态
  */
 const initializeProxyStatus = async () => {
   try {
     const status = await invoke('get_proxy_status') as any
     if (status.is_running && status.current_server) {
-      runningServerId.value = status.current_server
-      
-      // 更新对应服务器的状态
-      const server = servers.value.find(s => s.id === status.current_server)
+      // 使用name字段查找服务器，因为current_server返回的是服务器名称
+      const server = servers.value.find(s => s.name === status.current_server)
       if (server) {
+        runningServerId.value = server.id  // 设置为服务器ID而不是名称
         server.status = 'connected'
         appState.activeServer = server
         appState.isConnected = true
-        currentServerIndex.value = servers.value.findIndex(s => s.id === status.current_server)
+        currentServerIndex.value = servers.value.findIndex(s => s.name === status.current_server)
         startNetworkMonitoring()
       }
+    } else {
+      // 服务器未运行时，重置状态
+      runningServerId.value = null
+      appState.activeServer = null
+      appState.isConnected = false
+      // 将所有服务器状态设置为断开连接
+      servers.value.forEach(server => {
+        server.status = 'disconnected'
+      })
     }
+    
+    // 更新应用运行时间
+    appState.uptime = Math.floor((Date.now() - appStartTime.value) / 1000)
+    
+    // 同时加载代理模式
+    await loadProxyMode()
   } catch (error) {
     console.error('获取代理状态失败:', error)
   }
@@ -381,16 +525,14 @@ const initializeProxyStatus = async () => {
 const handleProxyStatusChange = (event: any) => {
   const { is_running, current_server } = event.payload
   
-  // 更新运行中的服务器ID
-  runningServerId.value = is_running ? current_server : null
-  
-  // 更新所有服务器的状态
+  // 更新所有服务器的状态 - 使用name字段比较，因为current_server是服务器名称
   servers.value.forEach(server => {
-    if (server.id === current_server && is_running) {
+    if (server.name === current_server && is_running) {
       server.status = 'connected'
+      runningServerId.value = server.id  // 设置为服务器ID而不是名称
       appState.activeServer = server
       appState.isConnected = true
-      currentServerIndex.value = servers.value.findIndex(s => s.id === current_server)
+      currentServerIndex.value = servers.value.findIndex(s => s.name === current_server)
     } else {
       server.status = 'disconnected'
       if (server.id === appState.activeServer?.id) {
@@ -400,7 +542,21 @@ const handleProxyStatusChange = (event: any) => {
     }
   })
   
+  // 如果没有运行的服务器，重置runningServerId
+  if (!is_running) {
+    runningServerId.value = null
+  }
+  
   console.log('代理状态已更新:', { is_running, current_server })
+}
+
+/**
+ * 监听代理模式变化事件
+ */
+const handleProxyModeChange = (event: any) => {
+  const { proxy_mode } = event.payload
+  appState.proxyMode = proxy_mode
+  console.log('代理模式已更新:', proxy_mode)
 }
 
 // 初始化应用
@@ -418,6 +574,7 @@ onMounted(async () => {
   try {
     const { listen } = await import('@tauri-apps/api/event')
     await listen('proxy-status-changed', handleProxyStatusChange)
+    await listen('proxy-mode-changed', handleProxyModeChange)
   } catch (error) {
     console.error('监听代理状态变化失败:', error)
   }

@@ -90,11 +90,17 @@ CreateAt: 2024-12-19
       
       <!-- 流量统计 -->
       <div class="bg-white/5 rounded-xl p-4 mb-6">
-        <div class="grid grid-cols-3 gap-4 text-center">
-          <div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="text-center">
+            <p class="text-xs text-gray-400 mb-1">会话流量</p>
+            <p class="text-lg font-bold text-blue-400">{{ formatBytes(sessionTraffic) }}</p>
+          </div>
+          <div class="text-center">
             <p class="text-xs text-gray-400 mb-1">总流量</p>
             <p class="text-lg font-bold text-white">{{ formatBytes(totalTraffic) }}</p>
           </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 text-center">
           <div>
             <p class="text-xs text-gray-400 mb-1">运行时间</p>
             <p class="text-lg font-bold text-white">{{ formatDuration(uptime) }}</p>
@@ -174,6 +180,8 @@ const props = withDefaults(defineProps<{
   downloadSpeed?: number
   /** 总流量 (bytes) */
   totalTraffic?: number
+  /** 会话流量 (bytes) */
+  sessionTraffic?: number
   /** 运行时间 (seconds) */
   uptime?: number
   /** 代理模式 */
@@ -184,6 +192,7 @@ const props = withDefaults(defineProps<{
   uploadSpeed: 0,
   downloadSpeed: 0,
   totalTraffic: 0,
+  sessionTraffic: 0,
   uptime: 0,
   proxyMode: 'global'
 })

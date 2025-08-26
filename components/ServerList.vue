@@ -1126,12 +1126,19 @@ const regenerateConfig = async (serverId: string) => {
     try {
       const status = await invoke('get_proxy_status') as any
       if (status.is_running && status.current_server) {
-        runningServerId.value = status.current_server
-        // 更新对应服务器的状态
-        const server = servers.value.find(s => s.id === status.current_server)
+        // 使用name字段查找服务器，因为current_server返回的是服务器名称
+        const server = servers.value.find(s => s.name === status.current_server)
         if (server) {
+          runningServerId.value = server.id  // 设置为服务器ID而不是名称
           server.status = 'connected'
         }
+      } else {
+        // 服务器未运行时，重置状态
+        runningServerId.value = null
+        // 将所有服务器状态设置为断开连接
+        servers.value.forEach(server => {
+          server.status = 'disconnected'
+        })
       }
     } catch (error) {
       console.error('获取代理状态失败:', error)
@@ -1142,17 +1149,20 @@ const regenerateConfig = async (serverId: string) => {
   const handleProxyStatusChange = (event: any) => {
     const { is_running, current_server } = event.payload
     
-    // 更新运行中的服务器ID
-    runningServerId.value = is_running ? current_server : null
-    
-    // 更新所有服务器的状态
+    // 更新所有服务器的状态 - 使用name字段比较，因为current_server是服务器名称
     servers.value.forEach(server => {
-      if (server.id === current_server && is_running) {
+      if (server.name === current_server && is_running) {
         server.status = 'connected'
+        runningServerId.value = server.id  // 设置为服务器ID而不是名称
       } else {
         server.status = 'disconnected'
       }
     })
+    
+    // 如果没有运行的服务器，重置runningServerId
+    if (!is_running) {
+      runningServerId.value = null
+    }
     
     console.log('代理状态已更新:', { is_running, current_server })
   }
@@ -1192,5 +1202,23 @@ const regenerateConfig = async (serverId: string) => {
     onUnmounted(() => {
       unlisten()
     })
+  })
+
+  /**
+   * 刷新服务器运行状态
+   * 用于从极简模式返回时同步服务器状态
+   */
+  const refreshServerStatus = async () => {
+    try {
+      await initializeProxyStatus()
+      console.log('服务器状态已刷新')
+    } catch (error) {
+      console.error('刷新服务器状态失败:', error)
+    }
+  }
+
+  // 暴露方法给父组件
+  defineExpose({
+    refreshServerStatus
   })
  </script>
