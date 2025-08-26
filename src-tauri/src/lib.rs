@@ -423,6 +423,15 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                             }
                         }
                         
+                        // 清理系统代理设置
+                        log_info!("应用关闭中，正在清理系统代理设置...");
+                        let system_manager = system::SystemManager::instance();
+                        if let Err(e) = system_manager.unset_proxy().await {
+                            log_error!("清理系统代理设置失败: {}", e);
+                        } else {
+                            log_info!("系统代理设置已清理");
+                        }
+                        
                         log_info!("应用清理完成，准备退出");
                     });
                 }
