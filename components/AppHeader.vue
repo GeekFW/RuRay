@@ -17,7 +17,7 @@
       </UButton>
 
       <UButton variant="ghost" size="sm" @click="toggleMinimalMode">
-        <Icon name="heroicons:minus" class="w-4 h-4 mr-1" />
+        <Icon name="heroicons:bolt" class="w-4 h-4 mr-1" />
         {{ $t('header.minimalMode') }}
       </UButton>
     </div>
@@ -209,6 +209,17 @@
                           </div>
                       </div>
                     </div>
+                    
+                    <!-- 日志流设置 -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <span class="text-sm font-medium">{{ $t('settings.core.logStream') }}</span>
+                          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $t('settings.core.logStreamDesc') }}</p>
+                        </div>
+                        <UToggle v-model="logStreamEnabled" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -308,18 +319,21 @@
               <div v-show="activeSettingsTab === 2" class="space-y-6">
                 <div>
                   <h3 class="text-lg font-medium mb-3">{{ $t('settings.core.title') }}</h3>
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <span>{{ $t('settings.core.path') }}</span>
-                      <div class="flex space-x-2">
-                        <UButton variant="outline" size="xs" @click="selectXrayPath" :disabled="isSelectingPath">
-                          {{ isSelectingPath ? $t('core.selecting') : $t('settings.core.browse') }}
-                        </UButton>
-                        <UButton variant="ghost" size="xs" @click="clearXrayPath" :disabled="!xrayPath" color="red">
-                          {{ $t('settings.core.clear') }}
-                        </UButton>
+                  <div class="space-y-4">
+                    <!-- Xray Core 路径设置 -->
+                    <div class="space-y-2">
+                      <div class="flex items-center justify-between">
+                        <span>{{ $t('settings.core.path') }}</span>
+                        <div class="flex space-x-2">
+                          <UButton variant="outline" size="xs" @click="selectXrayPath" :disabled="isSelectingPath">
+                            {{ isSelectingPath ? $t('core.selecting') : $t('settings.core.browse') }}
+                          </UButton>
+                          <UButton variant="ghost" size="xs" @click="clearXrayPath" :disabled="!xrayPath" color="red">
+                            {{ $t('settings.core.clear') }}
+                          </UButton>
+                        </div>
                       </div>
-                    </div>
+                      </div>
                     <UInput v-model="xrayPath" :placeholder="defaultXrayPathPlaceholder" class="text-xs" />
                     <div class="text-xs text-gray-500 dark:text-gray-400">
                       <span v-if="!xrayPath">
@@ -478,6 +492,9 @@ const isDownloadingGeoFiles = ref(false)
 const isEnsuring = ref(false)
 const setupProgress = ref(0)
 const setupStatus = ref('')
+
+// 日志流相关状态
+const logStreamEnabled = ref(false)
 
 const colorModeOptions = computed(() => [
   { label: $t('settings.theme.followSystem'), value: 'system' },
@@ -762,6 +779,7 @@ const saveSettings = async () => {
     config.http_port = parseInt(httpPort.value.toString()) || 10086
     config.socks_port = parseInt(socksPort.value.toString()) || 10087
     config.theme_color = selectedThemeColor.value || 'green'
+    config.log_stream_enabled = logStreamEnabled.value
 
     // 更新 inbound 配置
     config.inbound_sniffing_enabled = inboundSniffingEnabled.value
@@ -941,6 +959,7 @@ const loadSettings = async () => {
     socksPort.value = config.socks_port || 10087
     autoConnect.value = config.auto_connect || false
     selectedThemeColor.value = config.theme_color || 'green'
+    logStreamEnabled.value = config.log_stream_enabled || false
     
     // 加载语言配置
     try {

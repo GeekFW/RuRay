@@ -1,41 +1,47 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-    <!-- 启动加载动画 -->
-    <LoadingScreen v-if="isLoading" />
+  <div class="min-h-screen bg-gray-50 dark:bg-slate-900">
+    <!-- 如果是独立页面路由（如 advanced-log），直接显示页面内容 -->
+    <NuxtPage v-if="isStandalonePage" />
     
-    <!-- 主应用界面 -->
-    <div v-else-if="!isZenMode" class="h-screen flex flex-col">
-      <!-- 顶部菜单栏 -->
-      <AppHeader @toggle-zen-mode="toggleZenMode" />
+    <!-- 主应用内容 -->
+    <template v-else>
+      <!-- 启动加载动画 -->
+      <LoadingScreen v-if="isLoading" />
       
-      <!-- 主内容区域 -->
-      <div class="flex-1 flex overflow-hidden">
-        <!-- 左侧服务器列表 -->
-        <ServerList ref="serverListRef" class="w-100 border-r border-gray-200 dark:border-gray-700" />
+      <!-- 主应用界面 -->
+      <div v-else-if="!isZenMode" class="h-screen flex flex-col">
+        <!-- 顶部菜单栏 -->
+        <AppHeader @toggle-zen-mode="toggleZenMode" />
         
-        <!-- 右侧日志区域 -->
-        <LogViewer class="flex-1" />
+        <!-- 主内容区域 -->
+        <div class="flex-1 flex overflow-hidden">
+          <!-- 左侧服务器列表 -->
+          <ServerList ref="serverListRef" class="w-100 border-r border-gray-200 dark:border-gray-700" />
+          
+          <!-- 右侧日志区域 -->
+          <LogViewer class="flex-1" />
+        </div>
+        
+        <!-- 底部状态栏 -->
+        <StatusBar />
       </div>
       
-      <!-- 底部状态栏 -->
-      <StatusBar />
-    </div>
-    
-    <!-- 极简模式 (Zen Mode) -->
-    <Zen 
-      v-if="isZenMode"
-      :is-connected="appState.isConnected"
-      :active-server="appState.activeServer"
-      :upload-speed="appState.uploadSpeed"
-      :download-speed="appState.downloadSpeed"
-      :total-traffic="appState.totalTraffic"
-      :session-traffic="appState.sessionTraffic"
-      :uptime="appState.uptime"
-      :proxy-mode="appState.proxyMode"
-      @close="toggleZenMode"
-      @toggle-connection="toggleConnection"
-      @switch-server="switchServer"
-    />
+      <!-- 极简模式 (Zen Mode) -->
+      <Zen 
+        v-if="isZenMode"
+        :is-connected="appState.isConnected"
+        :active-server="appState.activeServer"
+        :upload-speed="appState.uploadSpeed"
+        :download-speed="appState.downloadSpeed"
+        :total-traffic="appState.totalTraffic"
+        :session-traffic="appState.sessionTraffic"
+        :uptime="appState.uptime"
+        :proxy-mode="appState.proxyMode"
+        @close="toggleZenMode"
+        @toggle-connection="toggleConnection"
+        @switch-server="switchServer"
+      />
+    </template>
     
     <!-- 全局通知 -->
     <UNotifications />
@@ -43,11 +49,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { useI18n } from 'vue-i18n'
+// 国际化 - 使用 Nuxt 的自动导入
+const { t } = useI18n()
 
-const { $t } = useI18n()
+// 路由相关
+const route = useRoute()
+
+// 检查是否为独立页面（如 advanced-log）
+const isStandalonePage = computed(() => {
+  return route.path === '/advanced-log'
+})
 
 /**
  * 服务器接口定义
@@ -151,8 +164,8 @@ const toggleConnection = async () => {
           
           const toast = useToast()
           toast.add({
-            title: $t('common.connected'),
-            description: `${$t('common.currentlyConnectedToServer')} "${runningServer.name}"`,
+            title: t('common.connected'),
+        description: `${t('common.currentlyConnectedToServer')} "${runningServer.name}"`,
             icon: 'i-heroicons-check-circle',
             color: 'green'
           })
@@ -162,8 +175,8 @@ const toggleConnection = async () => {
       // 没有服务器配置
       const toast = useToast()
       toast.add({
-        title: $t('common.noAvailableServers'),
-        description: $t('common.pleaseAddServerConfig'),
+        title: t('common.noAvailableServers'),
+        description: t('common.pleaseAddServerConfig'),
         icon: 'i-heroicons-exclamation-triangle',
         color: 'orange'
       })
@@ -178,8 +191,8 @@ const switchServer = async () => {
   if (servers.value.length <= 1) {
     const toast = useToast()
     toast.add({
-      title: $t('common.noOtherServers'),
-      description: $t('common.onlyOneServerConfig'),
+      title: t('common.noOtherServers'),
+        description: t('common.onlyOneServerConfig'),
       icon: 'i-heroicons-information-circle',
       color: 'blue'
     })
@@ -234,7 +247,7 @@ const loadServers = async () => {
       updated_at: server.updated_at
     }))
   } catch (error) {
-    console.error($t('common.loadServerListFailed'), error)
+    console.error(t('common.loadServerListFailed'), error)
   }
 }
 
@@ -260,19 +273,19 @@ const startProxy = async (serverId: string) => {
       
       const toast = useToast()
       toast.add({
-        title: $t('common.connectSuccess'),
-        description: `${$t('common.connectedToServer')} "${server.name}"`,
+        title: t('common.connectSuccess'),
+        description: `${t('common.connectedToServer')} "${server.name}"`,
         icon: 'i-heroicons-check-circle',
         color: 'green'
       })
     }
   } catch (error) {
-    console.error($t('common.startProxyFailed'), error)
+    console.error(t('common.startProxyFailed'), error)
     
     const toast = useToast()
     toast.add({
-      title: $t('common.connectFailed'),
-      description: `${$t('common.cannotConnectToServer')}: ${error}`,
+      title: t('common.connectFailed'),
+      description: `${t('common.cannotConnectToServer')}: ${error}`,
       icon: 'i-heroicons-exclamation-triangle',
       color: 'red'
     })
@@ -564,6 +577,12 @@ const handleProxyModeChange = (event: any) => {
 
 // 初始化应用
 onMounted(async () => {
+  // 如果是独立页面，跳过主应用初始化
+  if (isStandalonePage.value) {
+    isLoading.value = false
+    return
+  }
+  
   // 模拟加载时间
   await new Promise(resolve => setTimeout(resolve, 1000))
   

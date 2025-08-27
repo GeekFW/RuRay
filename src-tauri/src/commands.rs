@@ -979,3 +979,106 @@ pub async fn get_language_config() -> Result<String, String> {
     let config = AppConfig::load().map_err(|e| e.to_string())?;
     Ok(config.language)
 }
+
+// ==================== 日志流相关命令 ====================
+
+/// 日志流条目结构体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogStreamEntry {
+    pub timestamp: String,
+    pub level: String,
+    pub source: String, // "stdout" 或 "stderr"
+    pub message: String,
+}
+
+/// 订阅日志流
+/// 返回一个接收器，用于实时接收Xray的日志输出
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 订阅结果
+#[tauri::command]
+pub async fn subscribe_log_stream() -> Result<(), String> {
+    let proxy_manager = ProxyManager::instance();
+    
+    // 检查是否有活跃的日志流
+    if let Some(receiver) = proxy_manager.get_log_receiver().await {
+        // 日志流已存在，直接返回成功
+        Ok(())
+    } else {
+        Err("日志流未启用或Xray未运行".to_string())
+    }
+}
+
+/// 获取日志流缓冲区
+/// 返回当前缓冲区中的所有日志条目
+/// 
+/// # 返回值
+/// * `Result<Vec<LogStreamEntry>, String>` - 日志条目列表
+#[tauri::command]
+pub async fn get_log_stream_buffer() -> Result<Vec<LogStreamEntry>, String> {
+    let proxy_manager = ProxyManager::instance();
+    Ok(proxy_manager.get_log_buffer().await)
+}
+
+/// 检查日志流状态
+/// 检查日志流是否可用
+/// 
+/// # 返回值
+/// * `Result<bool, String>` - 日志流是否可用
+#[tauri::command]
+pub async fn is_log_stream_available() -> Result<bool, String> {
+    let proxy_manager = ProxyManager::instance();
+    Ok(proxy_manager.is_log_stream_active().await)
+}
+
+/// 清空日志流缓冲区
+/// 清空当前的日志流缓冲区
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 清空结果
+#[tauri::command]
+pub async fn clear_log_stream_buffer() -> Result<(), String> {
+    let proxy_manager = ProxyManager::instance();
+    proxy_manager.clear_log_buffer().await;
+    Ok(())
+}
+
+/// 打开高级日志查看器窗口
+/// 创建一个新的Tauri窗口来显示高级日志查看器
+/// 
+/// # 参数
+/// * `app_handle` - Tauri应用句柄
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 窗口创建结果
+#[tauri::command]
+pub async fn open_advanced_log_window(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri::{Manager, WebviewWindowBuilder};
+    
+    // 检查窗口是否已存在
+    if let Some(_) = app_handle.get_webview_window("advanced-log") {
+        // 窗口已存在，聚焦到该窗口
+        if let Some(window) = app_handle.get_webview_window("advanced-log") {
+            let _ = window.set_focus();
+        }
+        return Ok(());
+    }
+    
+    // 创建新的高级日志查看器窗口
+    let _window = WebviewWindowBuilder::new(
+        &app_handle,
+        "advanced-log",
+        tauri::WebviewUrl::App("/advanced-log".into())
+    )
+    .title("核心日志查看器 - RuRay")
+    .inner_size(800.0, 600.0)
+    .min_inner_size(600.0, 400.0)
+    .center()
+    .resizable(true)
+    .decorations(false)
+    .build()
+    .map_err(|e| format!("创建核心日志窗口失败: {}", e))?;
+    
+    log_info!("核心日志查看器窗口已创建");
+    Ok(())
+}

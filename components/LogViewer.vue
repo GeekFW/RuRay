@@ -47,6 +47,17 @@
             <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 mr-1" />
             {{ $t('common.export') }}
           </UButton>
+          
+          <!-- 高级日志查看器 -->
+          <UButton
+            variant="ghost"
+            size="sm"
+            @click="openAdvancedLogViewer"
+            :color="selectedThemeColor"
+          >
+            <Icon name="heroicons:rectangle-stack" class="w-4 h-4 mr-1" />
+            {{ $t('logViewer.advancedViewer') }}
+          </UButton>
         </div>
       </div>
     </div>
@@ -245,6 +256,15 @@ const exportLogs = async () => {
   } catch (error) {
     console.error($t('logViewer.exportLogsFailed'), error)
     // TODO: 显示错误通知
+  }
+}
+
+// 打开高级日志查看器窗口
+const openAdvancedLogViewer = async () => {
+  try {
+    await invoke('open_advanced_log_window')
+  } catch (error) {
+    console.error('Failed to open advanced log viewer:', error)
   }
 }
 

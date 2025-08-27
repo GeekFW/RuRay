@@ -7,12 +7,16 @@
 use anyhow::{Context, Result};
 use serde_json::json;
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::Stdio;
+use tokio::process::{Child, Command};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use tokio::time::Duration;
 use tokio::process::Command as TokioCommand;
 use sysinfo::System;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::sync::broadcast;
+use std::collections::VecDeque;
 
 // 导入日志宏
 use crate::{log_info, log_error};
@@ -29,6 +33,10 @@ pub struct ProxyManager {
     process: Arc<Mutex<Option<Child>>>,
     start_time: Arc<Mutex<Option<Instant>>>,
     current_server: Arc<Mutex<Option<String>>>,
+    /// 日志流广播发送器
+    log_sender: Arc<Mutex<Option<broadcast::Sender<String>>>>,
+    /// 日志缓冲区（保存最近的日志）
+    log_buffer: Arc<Mutex<VecDeque<String>>>,
 }
 
 // 全局单例实例
@@ -42,6 +50,8 @@ impl ProxyManager {
                 process: Arc::new(Mutex::new(None)),
                 start_time: Arc::new(Mutex::new(None)),
                 current_server: Arc::new(Mutex::new(None)),
+                log_sender: Arc::new(Mutex::new(None)),
+                log_buffer: Arc::new(Mutex::new(VecDeque::with_capacity(1000))),
             }
         })
     }
@@ -84,21 +94,43 @@ impl ProxyManager {
         }
 
         // 生成 Xray 配置
-        let config = self.generate_xray_config(server)?;
+        let xray_config = self.generate_xray_config(server)?;
         
         // 保存配置到指定目录（如果配置文件已存在则不重新创建）
-        let config_path = self.save_temp_config(&config, server, false)?;
+        let config_path = self.save_temp_config(&xray_config, server, false)?;
+        
+        // 检查是否启用日志流
+        let log_stream_enabled = config.log_stream_enabled;
         
         // 启动 Xray Core 进程
-        let child = Command::new(&xray_executable)
-            .arg("-config")
+        let mut cmd = Command::new(&xray_executable);
+        cmd.arg("-config")
             .arg(&config_path)
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
+            .stdin(Stdio::null());
+        
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+        
+        if log_stream_enabled {
+            // 如果启用日志流，则捕获输出
+            cmd.stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+        } else {
+            // 如果未启用日志流，则丢弃输出
+            cmd.stdout(Stdio::null())
+                .stderr(Stdio::null());
+        }
+        
+        let mut child = cmd.spawn()
             .context(format!("无法启动 Xray Core: {}", xray_executable.display()))?;
+        
+        // 如果启用了日志流，设置日志处理
+        if log_stream_enabled {
+            self.setup_log_stream(&mut child).await?;
+        }
 
         // 存储进程句柄
         {
@@ -143,6 +175,75 @@ impl ProxyManager {
         log_info!("Xray Core 启动成功");
         Ok(())
     }
+    
+    /// 设置日志流处理
+    /// 从Xray进程的stdout和stderr读取日志并广播给订阅者
+    async fn setup_log_stream(&self, child: &mut Child) -> Result<()> {
+        // 创建广播通道
+        let (sender, _) = broadcast::channel(1000);
+        
+        // 存储发送器
+        {
+            let mut log_sender = self.log_sender.lock().unwrap();
+            *log_sender = Some(sender.clone());
+        }
+        
+        // 处理stdout
+        if let Some(stdout) = child.stdout.take() {
+            let sender_clone = sender.clone();
+            let log_buffer = self.log_buffer.clone();
+            tokio::spawn(async move {
+                use tokio::io::AsyncBufReadExt;
+                let reader = BufReader::new(stdout);
+                let mut lines = reader.lines();
+                
+                while let Ok(Some(line)) = lines.next_line().await {
+                    let log_line = format!("[STDOUT] {}", line);
+                    
+                    // 添加到缓冲区
+                    {
+                        let mut buffer = log_buffer.lock().unwrap();
+                        if buffer.len() >= 1000 {
+                            buffer.pop_front();
+                        }
+                        buffer.push_back(log_line.clone());
+                    }
+                    
+                    // 广播日志
+                    let _ = sender_clone.send(log_line);
+                }
+            });
+        }
+        
+        // 处理stderr
+        if let Some(stderr) = child.stderr.take() {
+            let sender_clone = sender.clone();
+            let log_buffer = self.log_buffer.clone();
+            tokio::spawn(async move {
+                use tokio::io::AsyncBufReadExt;
+                let reader = BufReader::new(stderr);
+                let mut lines = reader.lines();
+                
+                while let Ok(Some(line)) = lines.next_line().await {
+                    let log_line = format!("[STDERR] {}", line);
+                    
+                    // 添加到缓冲区
+                    {
+                        let mut buffer = log_buffer.lock().unwrap();
+                        if buffer.len() >= 1000 {
+                            buffer.pop_front();
+                        }
+                        buffer.push_back(log_line.clone());
+                    }
+                    
+                    // 广播日志
+                    let _ = sender_clone.send(log_line);
+                }
+            });
+        }
+        
+        Ok(())
+    }
 
     /// 停止代理
     /// 确保完全终止 Xray Core 进程，包括强制杀死进程
@@ -164,14 +265,14 @@ impl ProxyManager {
         
         if let (Some(mut child), Some(pid)) = (child_opt, pid_opt) {
             // 首先尝试正常终止进程
-            if let Err(_) = child.kill() {
+            if let Err(_) = child.kill().await {
                 // 如果正常终止失败，使用系统命令强制终止
-                self.force_kill_process(pid).await?;
+                self.force_kill_process(pid.expect("Failed to get process ID")).await?;
             } else {
                 // 等待进程退出，如果超时则强制终止
                 let wait_result = tokio::time::timeout(
                     Duration::from_secs(3),
-                    tokio::task::spawn_blocking(move || child.wait())
+                    child.wait()
                 ).await;
                 
                 match wait_result {
@@ -180,7 +281,7 @@ impl ProxyManager {
                     }
                     _ => {
                         // 超时或等待失败，强制终止
-                        self.force_kill_process(pid).await?;
+                        self.force_kill_process(pid.expect("Failed to get process ID")).await?;
                     }
                 }
             }
@@ -199,6 +300,15 @@ impl ProxyManager {
         {
             let mut current_server = self.current_server.lock().unwrap();
             *current_server = None;
+        }
+
+        // 清理日志流资源
+        {
+            let mut log_sender = self.log_sender.lock().unwrap();
+            *log_sender = None;
+            
+            let mut log_buffer = self.log_buffer.lock().unwrap();
+            log_buffer.clear();
         }
 
         log_info!("Xray Core 已停止");
@@ -442,7 +552,7 @@ impl ProxyManager {
             system.refresh_processes();
             
             // 检查指定PID的进程是否存在
-            let pid = sysinfo::Pid::from_u32(pid);
+            let pid = sysinfo::Pid::from_u32(pid.expect("Failed to get process ID"));
             return system.process(pid).is_some();
         }
         false
@@ -927,5 +1037,74 @@ impl ProxyManager {
         
         let config_filename = format!("{}_{}_xray_config.json", server_id, safe_name);
         config_dir.join(config_filename)
+    }
+    
+    // ==================== 日志流相关方法 ====================
+    
+    /// 获取日志流接收器
+    /// 返回一个可用于接收实时日志的接收器
+    /// 
+    /// # 返回值
+    /// * `Option<broadcast::Receiver<String>>` - 日志接收器，如果日志流未启用则返回None
+    pub async fn get_log_receiver(&self) -> Option<broadcast::Receiver<String>> {
+        let log_sender = self.log_sender.lock().unwrap();
+        log_sender.as_ref().map(|sender| sender.subscribe())
+    }
+    
+    /// 获取日志流缓冲区
+    /// 返回当前缓冲区中的所有日志条目
+    /// 
+    /// # 返回值
+    /// * `Vec<crate::commands::LogStreamEntry>` - 日志条目列表
+    pub async fn get_log_buffer(&self) -> Vec<crate::commands::LogStreamEntry> {
+        use chrono::Utc;
+        
+        let buffer = self.log_buffer.lock().unwrap();
+        buffer.iter().map(|line| {
+            let (source, message) = if line.starts_with("[STDOUT]") {
+                ("stdout".to_string(), line[9..].to_string())
+            } else if line.starts_with("[STDERR]") {
+                ("stderr".to_string(), line[9..].to_string())
+            } else {
+                ("unknown".to_string(), line.clone())
+            };
+            
+            // 尝试从消息中提取日志级别
+            let level = if message.contains("[Info]") || message.contains("[INFO]") {
+                "info".to_string()
+            } else if message.contains("[Warning]") || message.contains("[WARN]") {
+                "warning".to_string()
+            } else if message.contains("[Error]") || message.contains("[ERROR]") {
+                "error".to_string()
+            } else if message.contains("[Debug]") || message.contains("[DEBUG]") {
+                "debug".to_string()
+            } else {
+                "info".to_string()
+            };
+            
+            crate::commands::LogStreamEntry {
+                timestamp: Utc::now().to_rfc3339(),
+                level,
+                source,
+                message,
+            }
+        }).collect()
+    }
+    
+    /// 检查日志流是否活跃
+    /// 检查日志流是否可用
+    /// 
+    /// # 返回值
+    /// * `bool` - 日志流是否活跃
+    pub async fn is_log_stream_active(&self) -> bool {
+        let log_sender = self.log_sender.lock().unwrap();
+        log_sender.is_some()
+    }
+    
+    /// 清空日志流缓冲区
+    /// 清空当前的日志流缓冲区
+    pub async fn clear_log_buffer(&self) {
+        let mut buffer = self.log_buffer.lock().unwrap();
+        buffer.clear();
     }
 }

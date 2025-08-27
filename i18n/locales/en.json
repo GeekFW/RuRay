@@ -46,7 +46,9 @@
     "loadFailed": "Load Failed",
     "saveSuccess": "Save Success",
     "saveFailed": "Save Failed",
-    "saveConfig": "Save Configuration"
+    "saveConfig": "Save Configuration",
+    "pause": "Pause",
+    "resume": "Resume"
   },
   "header": {
     "title": "RuRay",
@@ -114,7 +116,9 @@
       "notFound": "Xray Core Not Found",
       "recheck": "Recheck",
       "defaultPathHint": "Default Path",
-      "selectFile": "Select File"
+      "selectFile": "Select File",
+      "logStream": "Enable Log Stream",
+      "logStreamDesc": "Enable real-time Xray log viewing in the advanced log viewer"
     },
     "tabs": {
       "basic": "Basic Settings",
@@ -164,9 +168,9 @@
     },
     "proxyMode": {
       "title": "Proxy Mode",
-      "direct": "Direct",
-      "global": "Global",
-      "pac": "PAC"
+      "direct": "Direct Mode",
+      "global": "Global Proxy",
+      "pac": "PAC Mode"
     },
     "server": {
       "running": "Running",
@@ -301,6 +305,7 @@
     "noLogs": "No logs",
     "showingLogs": "Showing Logs",
     "totalLogs": "Total Logs",
+    "advancedViewer": "Core Logs",
     "levels": {
       "all": "All",
       "info": "Info",
@@ -309,6 +314,15 @@
     },
     "fetchLogsFailed": "Fetch logs failed",
     "exportLogsFailed": "Export logs failed"
+  },
+  "advancedLogViewer": {
+    "title": "Advanced Log Viewer",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "waitingForLogs": "Waiting for log data...",
+    "notConnected": "Not connected to Xray Core",
+    "totalLogs": "Total {count} logs",
+    "paused": "Paused"
   },
   "logs": {
     "title": "Log Settings",

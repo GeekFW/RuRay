@@ -46,7 +46,9 @@
     "loadFailed": "加载失败",
     "saveSuccess": "保存成功",
     "saveFailed": "保存失败",
-    "saveConfig": "保存配置"
+    "saveConfig": "保存配置",
+    "pause": "暂停",
+    "resume": "继续"
   },
   "header": {
     "title": "RuRay",
@@ -114,7 +116,9 @@
       "notFound": "Xray Core 未找到",
       "recheck": "重新检查",
       "defaultPathHint": "默认路径",
-      "selectFile": "选择文件"
+      "selectFile": "选择文件",
+      "logStream": "开启日志流",
+      "logStreamDesc": "启用后可在高级日志查看器中实时查看 Xray 运行日志"
     },
     "tabs": {
       "basic": "基础设置",
@@ -337,6 +341,7 @@
     "noLogs": "暂无日志",
     "showingLogs": "显示日志",
     "totalLogs": "总日志数",
+    "advancedViewer": "核心日志",
     "levels": {
       "all": "全部",
       "info": "信息",
@@ -345,6 +350,15 @@
     },
     "fetchLogsFailed": "获取日志失败",
     "exportLogsFailed": "导出日志失败"
+  },
+  "advancedLogViewer": {
+    "title": "核心日志查看器",
+    "connected": "已连接",
+    "disconnected": "未连接",
+    "waitingForLogs": "等待日志数据...",
+    "notConnected": "未连接到 Xray Core",
+    "totalLogs": "共 {count} 条日志",
+    "paused": "已暂停"
   },
   "logs": {
     "title": "日志设置",

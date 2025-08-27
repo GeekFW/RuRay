@@ -349,6 +349,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // 语言配置
             commands::update_language_config,
             commands::get_language_config,
+            // 日志流管理
+            commands::subscribe_log_stream,
+            commands::get_log_stream_buffer,
+            commands::is_log_stream_available,
+            commands::clear_log_stream_buffer,
+            commands::open_advanced_log_window,
         ])
         .setup(|app| {
             // 初始化应用配置

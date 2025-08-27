@@ -133,6 +133,9 @@ pub struct AppConfig {
     /// 是否启用TUN模式
     #[serde(default)]
     pub tun_enabled: bool,
+    /// 是否启用日志流
+    #[serde(default)]
+    pub log_stream_enabled: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -181,6 +184,7 @@ impl Default for AppConfig {
             routing_config: RoutingConfig::default(),
             tun_config: TunConfig::default(),
             tun_enabled: false,
+            log_stream_enabled: false,
             created_at: chrono::Utc::now().to_rfc3339(),
             updated_at: chrono::Utc::now().to_rfc3339(),
         }

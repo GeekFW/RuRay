@@ -46,7 +46,9 @@
     "loadFailed": "読み込み失敗",
     "saveSuccess": "保存成功",
     "saveFailed": "保存失敗",
-    "saveConfig": "設定保存"
+    "saveConfig": "設定保存",
+    "pause": "一時停止",
+    "resume": "再開"
   },
   "header": {
     "title": "RuRay",
@@ -301,6 +303,7 @@
     "noLogs": "ログなし",
     "showingLogs": "表示中のログ",
     "totalLogs": "総ログ数",
+    "advancedViewer": "コアログ",
     "levels": {
       "all": "すべて",
       "info": "情報",
@@ -309,6 +312,15 @@
     },
     "fetchLogsFailed": "ログ取得失敗",
     "exportLogsFailed": "ログエクスポート失敗"
+  },
+  "advancedLogViewer": {
+    "title": "高度なログビューア",
+    "connected": "接続済み",
+    "disconnected": "未接続",
+    "waitingForLogs": "ログデータを待機中...",
+    "notConnected": "Xray Coreに接続されていません",
+    "totalLogs": "合計 {count} 件のログ",
+    "paused": "一時停止中"
   },
   "logs": {
     "title": "ログ設定",
