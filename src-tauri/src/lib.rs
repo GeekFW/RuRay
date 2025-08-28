@@ -403,43 +403,49 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
             Ok(())
         })
-        .on_window_event(|_window, event| {
+        .on_window_event(|window, event| {
             match event {
                 WindowEvent::CloseRequested { .. } => {
-                    // 在窗口关闭时停止所有服务
-                    tauri::async_runtime::spawn(async move {
-                        // 检查并停止代理服务器
-                        let proxy_manager = proxy::ProxyManager::instance();
-                        if proxy_manager.is_process_running() {
-                            log_info!("应用关闭中，检测到正在运行的代理服务器，正在停止...");
-                            if let Err(e) = proxy_manager.stop().await {
-                                log_error!("停止代理服务器失败: {}", e);
-                            } else {
-                                log_info!("代理服务器已停止");
+                    // 只有在主窗口关闭时才停止所有服务
+                    if window.label() == "main" {
+                        // 在主窗口关闭时停止所有服务
+                        tauri::async_runtime::spawn(async move {
+                            // 检查并停止代理服务器
+                            let proxy_manager = proxy::ProxyManager::instance();
+                            if proxy_manager.is_process_running() {
+                                log_info!("应用关闭中，检测到正在运行的代理服务器，正在停止...");
+                                if let Err(e) = proxy_manager.stop().await {
+                                    log_error!("停止代理服务器失败: {}", e);
+                                } else {
+                                    log_info!("代理服务器已停止");
+                                }
                             }
-                        }
-                        
-                        // 停止TUN模式
-                        if tun::TunManager::instance().is_running_sync() {
-                            log_info!("应用关闭中，正在停止TUN模式...");
-                            if let Err(e) = tun::TunManager::instance().stop_sync() {
-                                log_error!("停止TUN模式失败: {}", e);
-                            } else {
-                                log_info!("TUN模式已停止");
+                            
+                            // 停止TUN模式
+                            if tun::TunManager::instance().is_running_sync() {
+                                log_info!("应用关闭中，正在停止TUN模式...");
+                                if let Err(e) = tun::TunManager::instance().stop_sync() {
+                                    log_error!("停止TUN模式失败: {}", e);
+                                } else {
+                                    log_info!("TUN模式已停止");
+                                }
                             }
-                        }
-                        
-                        // 清理系统代理设置
-                        log_info!("应用关闭中，正在清理系统代理设置...");
-                        let system_manager = system::SystemManager::instance();
-                        if let Err(e) = system_manager.unset_proxy().await {
-                            log_error!("清理系统代理设置失败: {}", e);
-                        } else {
-                            log_info!("系统代理设置已清理");
-                        }
-                        
-                        log_info!("应用清理完成，准备退出");
-                    });
+                            
+                            // 清理系统代理设置
+                            log_info!("应用关闭中，正在清理系统代理设置...");
+                            let system_manager = system::SystemManager::instance();
+                            if let Err(e) = system_manager.unset_proxy().await {
+                                log_error!("清理系统代理设置失败: {}", e);
+                            } else {
+                                log_info!("系统代理设置已清理");
+                            }
+                            
+                            log_info!("应用清理完成，准备退出");
+                        });
+                    } else {
+                        // 子窗口关闭时只记录日志，不执行清理操作
+                        log_info!("子窗口 '{}' 正在关闭", window.label());
+                    }
                 }
                 _ => {}
             }
