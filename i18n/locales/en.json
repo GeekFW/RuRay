@@ -48,7 +48,8 @@
     "saveFailed": "Save Failed",
     "saveConfig": "Save Configuration",
     "pause": "Pause",
-    "resume": "Resume"
+    "resume": "Resume",
+    "visit": "Visit"
   },
   "header": {
     "title": "RuRay",
@@ -66,13 +67,15 @@
     "checkingXrayCore": "Checking Xray Core...",
     "loadingConfig": "Loading configuration...",
     "preparingUI": "Preparing interface...",
-    "startupComplete": "Startup complete"
+    "startupComplete": "Startup complete",
+    "subtitle": "Xray Core Desktop Client"
   },
   "update": {
     "checkAndDownload": "Check and Download",
     "downloadProgress": "Download Progress",
     "updating": "Updating...",
-    "startUpdate": "Start Update"
+    "startUpdate": "Start Update",
+    "currentVersion": "Current Version"
   },
   "settings": {
     "title": "Settings",
@@ -125,7 +128,38 @@
       "routing": "Routing Settings",
       "core": "Core Settings",
       "tun": "TUN Configuration",
-      "logs": "Log Settings"
+      "logs": "Log Settings",
+      "about": "About"
+    },
+    "about": {
+      "title": "About RuRay",
+      "projectInfo": "Project Information",
+      "projectName": "RuRay",
+      "projectDescription": "A modern Xray client built with Tauri and Vue, providing a clean and user-friendly proxy management interface.",
+      "githubRepository": "GitHub Repository",
+      "repositoryDesc": "View project source code and contribution guidelines",
+      "description": "Project Description",
+      "descriptionText": "A modern Xray client built with Tauri and Vue, providing a clean and user-friendly proxy management interface.",
+      "openSourceLibraries": "Open Source Libraries",
+      "versionInfo": "Version Information",
+      "currentVersion": "Current Version",
+      "libraries": {
+        "tauri": "Cross-platform application framework",
+        "nuxt": "Vue.js framework",
+        "vue": "Frontend framework",
+        "tailwindcss": "CSS framework",
+        "rust": "Systems programming language",
+        "xraycore": "Proxy core",
+        "tauriVersion": "v2.x",
+        "nuxtVersion": "v3.x",
+        "vueVersion": "v3.x",
+        "tailwindVersion": "v3.x",
+        "rustDesc": "Backend",
+        "xraycoreDesc": "Proxy Engine"
+      },
+      "version": "Version Information",
+      "latest": "Latest",
+      "visitGithub": "Visit GitHub"
     },
     "saveSuccess": "Save Success",
     "saveError": "Save Failed"

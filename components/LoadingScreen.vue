@@ -13,7 +13,7 @@
         RuRay
       </h1>
       <p class="text-lg text-gray-600 dark:text-gray-400 mb-8">
-        Xray Core Desktop Client
+        {{ $t('loadingScreen.subtitle') }}
       </p>
       
       <!-- 加载动画 -->

@@ -308,13 +308,21 @@ impl XrayManager {
 
         let version_output = String::from_utf8_lossy(&output.stdout);
         
-        // 解析版本信息
+        // 解析版本信息，提取 "Xray X.X.X" 格式的版本号
         for line in version_output.lines() {
-            if line.contains("Xray") && line.contains("(") {
-                if let Some(start) = line.find("(") {
-                    if let Some(end) = line.find(")") {
-                        let version = &line[start + 1..end];
-                        return Ok(version.to_string());
+            if line.contains("Xray") {
+                // 查找 "Xray" 后面的版本号
+                if let Some(xray_pos) = line.find("Xray") {
+                    let after_xray = &line[xray_pos..];
+                    // 使用正则表达式或简单的字符串处理来提取版本号
+                    if let Some(space_pos) = after_xray.find(' ') {
+                        let version_part = &after_xray[space_pos + 1..];
+                        // 查找版本号结束位置（遇到空格或括号）
+                        let end_pos = version_part.find(' ').unwrap_or_else(|| {
+                            version_part.find('(').unwrap_or(version_part.len())
+                        });
+                        let version = format!("Xray {}", &version_part[..end_pos]);
+                        return Ok(version);
                     }
                 }
             }
@@ -417,13 +425,13 @@ impl XrayManager {
     /// 检查地理位置数据文件是否存在
     /// 
     /// # 返回值
-    /// * `Result<bool>` - 文件是否都存在
+    /// * `Result<bool>` - 文件是否有一个存在
     pub fn check_geo_files_exist(&self) -> Result<bool> {
         let xray_dir = AppConfig::xray_dir()?;
         let geoip_path = xray_dir.join("geoip.dat");
         let geosite_path = xray_dir.join("geosite.dat");
         
-        Ok(geoip_path.exists() && geosite_path.exists())
+        Ok(geoip_path.exists() || geosite_path.exists())
     }
 
     /// 确保所有必需文件都存在（Xray 可执行文件和地理位置数据文件）

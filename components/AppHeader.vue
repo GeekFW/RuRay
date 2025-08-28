@@ -11,7 +11,7 @@
 
     <!-- 中间菜单 -->
     <div class="flex items-center space-x-1 no-drag">
-      <UButton variant="ghost" size="sm" @click="showUpdateDialog = true">
+      <UButton variant="ghost" size="sm" @click="openUpdateDialog">
         <Icon name="heroicons:arrow-down-tray" class="w-4 h-4 mr-1" />
         {{ $t('header.updateXrayCore') }}
       </UButton>
@@ -64,6 +64,14 @@
           <p class="text-gray-600 dark:text-gray-400">
             {{ $t('update.checkAndDownload') }}
           </p>
+
+          <!-- 当前版本信息 -->
+          <div v-if="currentXrayVersion" class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-gray-600 dark:text-gray-400">{{ $t('update.currentVersion') }}</span>
+              <span class="text-sm font-medium text-gray-900 dark:text-white">{{ currentXrayVersion }}</span>
+            </div>
+          </div>
 
           <div v-if="updateStatus" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
             <p class="text-sm text-blue-700 dark:text-blue-300">{{ updateStatus }}</p>
@@ -401,6 +409,162 @@
               <div v-show="activeSettingsTab === 4" class="space-y-6">
                 <LogSettings />
               </div>
+
+              <!-- 关于 Tab -->
+              <div v-show="activeSettingsTab === 5" class="space-y-6">
+                <div>
+                  <h3 class="text-lg font-medium mb-4">{{ $t('settings.about.title') }}</h3>
+                  
+                  <!-- 项目信息 -->
+                  <div class="space-y-4">
+                    <!-- 项目地址 -->
+                    <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div class="flex items-center space-x-3">
+                        <Icon name="simple-icons:github" class="w-6 h-6 text-gray-700 dark:text-gray-300" />
+                        <div>
+                          <h4 class="font-medium text-gray-900 dark:text-white">{{ $t('settings.about.repository') }}</h4>
+                          <p class="text-sm text-gray-500 dark:text-gray-400">{{ $t('settings.about.repositoryDesc') }}</p>
+                        </div>
+                      </div>
+                      <UButton 
+                        variant="outline" 
+                        size="sm" 
+                        @click="openGitHub"
+                        icon="i-heroicons-arrow-top-right-on-square"
+                      >
+                        {{ $t('settings.about.visitGithub') }}
+                      </UButton>
+                    </div>
+
+                    <!-- 项目简介 -->
+                    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <h4 class="font-medium text-gray-900 dark:text-white mb-2">{{ $t('settings.about.description') }}</h4>
+                      <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                        {{ $t('settings.about.descriptionText') }}
+                      </p>
+                    </div>
+
+                    <!-- 开源库信息 -->
+                    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <h4 class="font-medium text-gray-900 dark:text-white mb-3">{{ $t('settings.about.openSourceLibraries') }}</h4>
+                      <div class="space-y-3">
+                        <!-- Tauri -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center space-x-2">
+                            <Icon name="simple-icons:tauri" class="w-4 h-4 text-orange-500" />
+                            <span class="text-sm font-medium">Tauri</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ $t('settings.about.libraries.tauriVersion') }}</span>
+                          </div>
+                          <UButton 
+                            variant="ghost" 
+                            size="xs" 
+                            @click="openUrl('https://tauri.app')"
+                            icon="i-heroicons-arrow-top-right-on-square"
+                          >
+                            {{ $t('common.visit') }}
+                          </UButton>
+                        </div>
+
+                        <!-- Nuxt -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center space-x-2">
+                            <Icon name="simple-icons:nuxtdotjs" class="w-4 h-4 text-green-500" />
+                            <span class="text-sm font-medium">Nuxt</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ $t('settings.about.libraries.nuxtVersion') }}</span>
+                          </div>
+                          <UButton 
+                            variant="ghost" 
+                            size="xs" 
+                            @click="openUrl('https://nuxt.com')"
+                            icon="i-heroicons-arrow-top-right-on-square"
+                          >
+                            {{ $t('common.visit') }}
+                          </UButton>
+                        </div>
+
+                        <!-- Vue -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center space-x-2">
+                            <Icon name="simple-icons:vuedotjs" class="w-4 h-4 text-green-600" />
+                            <span class="text-sm font-medium">Vue</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ $t('settings.about.libraries.vueVersion') }}</span>
+                          </div>
+                          <UButton 
+                            variant="ghost" 
+                            size="xs" 
+                            @click="openUrl('https://vuejs.org')"
+                            icon="i-heroicons-arrow-top-right-on-square"
+                          >
+                            {{ $t('common.visit') }}
+                          </UButton>
+                        </div>
+
+                        <!-- Tailwind CSS -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center space-x-2">
+                            <Icon name="simple-icons:tailwindcss" class="w-4 h-4 text-cyan-500" />
+                            <span class="text-sm font-medium">Tailwind CSS</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ $t('settings.about.libraries.tailwindVersion') }}</span>
+                          </div>
+                          <UButton 
+                            variant="ghost" 
+                            size="xs" 
+                            @click="openUrl('https://tailwindcss.com')"
+                            icon="i-heroicons-arrow-top-right-on-square"
+                          >
+                            {{ $t('common.visit') }}
+                          </UButton>
+                        </div>
+
+                        <!-- Rust -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center space-x-2">
+                            <Icon name="simple-icons:rust" class="w-4 h-4 text-orange-600" />
+                            <span class="text-sm font-medium">Rust</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ $t('settings.about.libraries.rustDesc') }}</span>
+                          </div>
+                          <UButton 
+                            variant="ghost" 
+                            size="xs" 
+                            @click="openUrl('https://www.rust-lang.org')"
+                            icon="i-heroicons-arrow-top-right-on-square"
+                          >
+                            {{ $t('common.visit') }}
+                          </UButton>
+                        </div>
+
+                        <!-- Xray Core -->
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center space-x-2">
+                            <Icon name="heroicons:bolt" class="w-4 h-4 text-purple-500" />
+                            <span class="text-sm font-medium">Xray Core</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ $t('settings.about.libraries.xraycoreDesc') }}</span>
+                          </div>
+                          <UButton 
+                            variant="ghost" 
+                            size="xs" 
+                            @click="openUrl('https://github.com/XTLS/Xray-core')"
+                            icon="i-heroicons-arrow-top-right-on-square"
+                          >
+                            {{ $t('common.visit') }}
+                          </UButton>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 版本信息 -->
+                    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <h4 class="font-medium text-gray-900 dark:text-white mb-2">{{ $t('settings.about.version') }}</h4>
+                      <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Ruray v{{ appVersion }}</span>
+                        <UBadge variant="soft" color="green" size="sm">
+                          {{ $t('settings.about.latest') }}
+                        </UBadge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -427,6 +591,7 @@ import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
+import { getVersion } from '@tauri-apps/api/app'
 import { useI18n } from 'vue-i18n'
 
 const toast = useToast()
@@ -444,6 +609,7 @@ const activeSettingsTab = ref(0)
 const isUpdating = ref(false)
 const updateStatus = ref('')
 const updateProgress = ref(0)
+const currentXrayVersion = ref('')
 
 // 设置选项
 const selectedColorMode = ref(colorMode.preference)
@@ -495,6 +661,9 @@ const setupStatus = ref('')
 
 // 日志流相关状态
 const logStreamEnabled = ref(false)
+
+// 应用版本信息
+const appVersion = ref('')
 
 const colorModeOptions = computed(() => [
   { label: $t('settings.theme.followSystem'), value: 'system' },
@@ -550,7 +719,8 @@ const settingsTabOptions = computed(() => [
   { label: $t('settings.tabs.routing'), value: 1 },
   { label: $t('settings.tabs.core'), value: 2 },
   { label: $t('settings.tabs.tun'), value: 3 },
-  { label: $t('settings.tabs.logs'), value: 4 }
+  { label: $t('settings.tabs.logs'), value: 4 },
+  { label: $t('settings.tabs.about'), value: 5 }
 ])
 
 // 计算属性：处理颜色模式选项的双向绑定
@@ -715,6 +885,23 @@ const removeDomainRule = (ruleIndex: number, domainIndex: number) => {
   routingRules.value[ruleIndex].domain.splice(domainIndex, 1)
 }
 
+// 获取当前 Xray Core 版本
+const getCurrentXrayVersion = async () => {
+  try {
+    currentXrayVersion.value = await invoke('get_xray_version')
+    console.log(currentXrayVersion)
+  } catch (error) {
+    console.error('获取 Xray Core 版本失败:', error)
+    currentXrayVersion.value = ''
+  }
+}
+
+// 打开更新对话框
+const openUpdateDialog = async () => {
+  showUpdateDialog.value = true
+  await getCurrentXrayVersion()
+}
+
 const startUpdate = async () => {
   isUpdating.value = true
   updateProgress.value = 0
@@ -752,7 +939,10 @@ const startUpdate = async () => {
     unlisten()
 
     // 下载完成后的处理
-    setTimeout(() => {
+    setTimeout(async () => {
+      // 重新获取版本信息
+      await getCurrentXrayVersion()
+      
       showUpdateDialog.value = false
       isUpdating.value = false
       updateProgress.value = 0
@@ -1007,8 +1197,32 @@ const loadSettings = async () => {
 
     // 检查地理位置数据文件是否存在
     await checkGeoFilesExist()
+    
+    // 获取 Tauri 版本信息
+    try {
+      appVersion.value = await getVersion()
+    } catch (error) {
+      console.error('获取程序版本失败:', error)
+      appVersion.value = '未知版本'
+    }
   } catch (error) {
     console.error('加载设置失败:', error)
+  }
+}
+
+// 打开链接的方法
+const openGitHub = async () => {
+  await openUrl('https://github.com/GeekFW/RuRay')
+}
+
+const openUrl = async (url: string) => {
+  try {
+    const { open } = await import('@tauri-apps/plugin-shell')
+    await open(url)
+  } catch (error) {
+    console.error('打开链接失败:', error)
+    // 降级方案：使用浏览器打开
+    window.open(url, '_blank')
   }
 }
 

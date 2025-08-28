@@ -48,7 +48,8 @@
     "saveFailed": "保存失败",
     "saveConfig": "保存配置",
     "pause": "暂停",
-    "resume": "继续"
+    "resume": "继续",
+    "visit": "访问"
   },
   "header": {
     "title": "RuRay",
@@ -66,13 +67,15 @@
     "checkingXrayCore": "检查 Xray Core...",
     "loadingConfig": "加载配置...",
     "preparingUI": "准备界面...",
-    "startupComplete": "启动完成"
+    "startupComplete": "启动完成",
+    "subtitle": "Xray Core 桌面客户端"
   },
   "update": {
     "checkAndDownload": "检查并下载",
     "downloadProgress": "下载进度",
     "updating": "更新中...",
-    "startUpdate": "开始更新"
+    "startUpdate": "开始更新",
+    "currentVersion": "当前版本"
   },
   "settings": {
     "title": "设置",
@@ -125,7 +128,39 @@
       "routing": "路由设置",
       "core": "Core设置",
       "tun": "TUN配置",
-      "logs": "日志设置"
+      "logs": "日志设置",
+      "about": "关于"
+    },
+    "about": {
+      "title": "关于 RuRay",
+      "projectInfo": "项目信息",
+      "projectName": "RuRay",
+      "projectDescription": "基于 Tauri 和 Vue 构建的现代化 Xray 客户端，提供简洁易用的代理管理界面。",
+      "githubRepository": "GitHub 仓库",
+      "repositoryDesc": "查看项目源代码和贡献指南",
+      "description": "项目描述",
+      "descriptionText": "基于 Tauri 和 Vue 构建的现代化 Xray 客户端，提供简洁易用的代理管理界面。",
+      "openSourceLibraries": "开源库",
+      "versionInfo": "版本信息",
+      "currentVersion": "当前版本",
+      "libraries": {
+        "tauri": "跨平台应用框架",
+        "nuxt": "Vue.js 框架",
+        "vue": "前端框架",
+        "tailwindcss": "CSS 框架",
+        "rust": "系统编程语言",
+        "xraycore": "代理核心",
+        "tauriVersion": "v2.x",
+        "nuxtVersion": "v3.x",
+        "vueVersion": "v3.x",
+        "tailwindVersion": "v3.x",
+        "rustDesc": "后端",
+        "xraycoreDesc": "代理引擎"
+      },
+      "version": "版本信息",
+      "latest": "最新版本",
+      "visitGithub": "访问 GitHub",
+      "repository": "源码仓库"
     },
     "saveSuccess": "保存成功",
     "saveError": "保存失败"

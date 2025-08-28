@@ -48,7 +48,8 @@
     "saveFailed": "保存失敗",
     "saveConfig": "設定保存",
     "pause": "一時停止",
-    "resume": "再開"
+    "resume": "再開",
+    "visit": "訪問"
   },
   "header": {
     "title": "RuRay",
@@ -66,13 +67,15 @@
     "checkingXrayCore": "Xray Coreを確認中...",
     "loadingConfig": "設定を読み込み中...",
     "preparingUI": "インターフェースを準備中...",
-    "startupComplete": "起動完了"
+    "startupComplete": "起動完了",
+    "subtitle": "Xray Core デスクトップクライアント"
   },
   "update": {
-    "checkAndDownload": "確認とダウンロード",
+    "checkAndDownload": "チェックとダウンロード",
     "downloadProgress": "ダウンロード進行状況",
     "updating": "更新中...",
-    "startUpdate": "更新開始"
+    "startUpdate": "更新開始",
+    "currentVersion": "現在のバージョン"
   },
   "settings": {
     "title": "設定",
@@ -123,7 +126,38 @@
       "routing": "ルーティング設定",
       "core": "Core設定",
       "tun": "TUN設定",
-      "logs": "ログ設定"
+      "logs": "ログ設定",
+      "about": "について"
+    },
+    "about": {
+      "title": "RuRay について",
+      "projectInfo": "プロジェクト情報",
+      "projectName": "RuRay",
+      "projectDescription": "Tauri と Vue で構築されたモダンな Xray クライアント。シンプルで使いやすいプロキシ管理インターフェースを提供します。",
+      "githubRepository": "GitHub リポジトリ",
+      "repositoryDesc": "プロジェクトのソースコードと貢献ガイドラインを表示",
+      "description": "プロジェクト説明",
+      "descriptionText": "Tauri と Vue で構築されたモダンな Xray クライアント。シンプルで使いやすいプロキシ管理インターフェースを提供します。",
+      "openSourceLibraries": "オープンソースライブラリ",
+      "versionInfo": "バージョン情報",
+      "currentVersion": "現在のバージョン",
+      "libraries": {
+        "tauri": "クロスプラットフォームアプリケーションフレームワーク",
+        "nuxt": "Vue.js フレームワーク",
+        "vue": "フロントエンドフレームワーク",
+        "tailwindcss": "CSS フレームワーク",
+        "rust": "システムプログラミング言語",
+        "xraycore": "プロキシコア",
+        "tauriVersion": "v2.x",
+        "nuxtVersion": "v3.x",
+        "vueVersion": "v3.x",
+        "tailwindVersion": "v3.x",
+        "rustDesc": "バックエンド",
+        "xraycoreDesc": "プロキシエンジン"
+      },
+      "version": "バージョン情報",
+      "latest": "最新版",
+      "visitGithub": "GitHub を訪問"
     },
     "saveSuccess": "保存成功",
     "saveError": "保存失敗"
