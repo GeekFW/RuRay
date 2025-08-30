@@ -68,12 +68,7 @@ pub struct TunConfig {
     pub mtu: u16,
     /// 是否启用
     pub enabled: bool,
-    /// 严格路由模式：确保所有流量都通过TUN设备，防止流量泄漏
-    #[serde(default)]
-    pub strict_route: bool,
-    /// DNS劫持：拦截DNS查询并重定向到指定DNS服务器
-    #[serde(default)]
-    pub dns_hijack: bool,
+
     /// 自定义DNS服务器地址
     #[serde(default = "default_dns_server")]
     pub dns_server: String,
@@ -100,8 +95,6 @@ impl Default for TunConfig {
             gateway: IpAddr::V4(Ipv4Addr::new(192, 168, 55, 1)),
             mtu: 1500,
             enabled: false,
-            strict_route: true,  // 默认启用严格路由模式
-            dns_hijack: false,   // 默认不启用DNS劫持
             dns_server: default_dns_server(),  // 默认DNS服务器
             fake_ip: false,      // 默认不启用FakeIP模式
             fake_ip_start: default_fake_ip_start(),  // FakeIP起始地址
@@ -380,17 +373,6 @@ impl TunManager {
         #[cfg(target_os = "windows")]
         {
             cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-        
-        // 如果启用了严格路由模式，添加相应参数
-        if config.strict_route {
-            cmd.arg("--strict-route");
-        }
-        
-        // 如果启用了DNS劫持，添加相应参数
-        if config.dns_hijack {
-            cmd.arg("--dns-hijack")
-               .arg(&config.dns_server);
         }
         
         // 打印完整的命令行参数用于调试
