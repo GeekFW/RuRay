@@ -372,6 +372,16 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // 设置TunManager的应用句柄
             tun::TunManager::instance().set_app_handle(app.handle().clone());
             
+            // 从配置文件加载TUN配置到TunManager
+            if let Ok(app_config) = config::AppConfig::load() {
+                let tun_manager = tun::TunManager::instance();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = tun_manager.update_config(app_config.tun_config).await {
+                        log_error!("加载TUN配置失败: {}", e);
+                    }
+                });
+            }
+            
             // 设置SystemManager的应用句柄
             system::SystemManager::instance().set_app_handle(app.handle().clone());
             

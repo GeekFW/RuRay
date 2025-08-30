@@ -86,6 +86,9 @@ pub struct TunConfig {
     /// FakeIP地址池范围结束地址
     #[serde(default = "default_fake_ip_end")]
     pub fake_ip_end: IpAddr,
+    /// 路由绕过IP地址列表
+    #[serde(default, rename = "bypassIps")]
+    pub bypass_ips: Vec<String>,
 }
 
 impl Default for TunConfig {
@@ -103,6 +106,7 @@ impl Default for TunConfig {
             fake_ip: false,      // 默认不启用FakeIP模式
             fake_ip_start: default_fake_ip_start(),  // FakeIP起始地址
             fake_ip_end: default_fake_ip_end(),      // FakeIP结束地址
+            bypass_ips: Vec::new(),
         }
     }
 }
@@ -365,6 +369,13 @@ impl TunManager {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         
+        // 添加用户配置的绕过IP地址
+        for bypass_ip in &config.bypass_ips {
+            if !bypass_ip.trim().is_empty() {
+                cmd.arg("--bypass").arg(bypass_ip.trim());
+            }
+        }
+        
         // Windows平台下隐藏命令行窗口
         #[cfg(target_os = "windows")]
         {
@@ -381,6 +392,12 @@ impl TunManager {
             cmd.arg("--dns-hijack")
                .arg(&config.dns_server);
         }
+        
+        // 打印完整的命令行参数用于调试
+        let args: Vec<String> = std::iter::once(tun2proxy_path.to_string_lossy().to_string())
+            .chain(cmd.as_std().get_args().map(|arg| arg.to_string_lossy().to_string()))
+            .collect();
+        log_info!("tun2proxy命令行参数: {}", args.join(" "));
         
         // 启动tun2proxy进程
         let child = cmd.spawn()

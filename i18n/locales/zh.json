@@ -59,7 +59,11 @@
     "updateStatus": {
       "checking": "检查更新中...",
       "latest": "已是最新版本",
-      "error": "检查更新失败"
+      "error": "检查更新失败",
+      "runningError": "无法在 Xray Core 运行时进行更新，请先停止代理",
+      "downloadError": "下载失败，请检查网络连接",
+      "replaceError": "文件替换失败，请检查文件权限",
+      "completed": "更新完成"
     }
   },
   "loadingScreen": {
@@ -519,6 +523,9 @@
     "gatewayAddressHelp": "默认网关地址",
     "routePriority": "路由优先级",
     "routePriorityHelp": "路由的优先级设置",
+    "bypassIps": "路由绕过IP",
+    "bypassIpsHelp": "指定不通过代理的IP地址或CIDR网段，支持多个地址",
+    "addBypassIp": "添加绕过IP",
     "loadConfigFailed": "加载配置失败",
     "loadConfigFailedDesc": "加载TUN配置失败",
     "invalidConfig": "配置无效",

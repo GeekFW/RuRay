@@ -159,7 +159,8 @@
       },
       "version": "Version Information",
       "latest": "Latest",
-      "visitGithub": "Visit GitHub"
+      "visitGithub": "Visit GitHub",
+      "repository": "Source Repository"
     },
     "saveSuccess": "Save Success",
     "saveError": "Save Failed"
@@ -482,6 +483,9 @@
     "gatewayAddressHelp": "Default gateway address",
     "routePriority": "Route Priority",
     "routePriorityHelp": "Route priority setting",
+    "bypassIps": "Bypass IPs",
+    "bypassIpsHelp": "Specify IP addresses or CIDR ranges that should bypass the proxy, supports multiple addresses",
+    "addBypassIp": "Add Bypass IP",
     "loadConfigFailed": "Load configuration failed",
     "loadConfigFailedDesc": "Failed to load TUN configuration",
     "invalidConfig": "Invalid configuration",

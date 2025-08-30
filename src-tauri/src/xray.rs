@@ -75,9 +75,31 @@ impl XrayManager {
     }
 
     /// 下载 Xray Core 更新
+    /// 
+    /// # 参数
+    /// * `version` - 要下载的版本号
+    /// 
+    /// # 返回值
+    /// * `Result<()>` - 下载结果
+    /// 
+    /// # 异常
+    /// * 当 Xray 正在运行时返回错误
+    /// * 当下载失败时返回错误
+    /// * 当文件替换失败时返回错误
     pub async fn download_update(&self, version: &str) -> Result<()> {
+        // 检查 Xray 是否正在运行
+        if self.is_xray_running().await? {
+            return Err(anyhow::anyhow!("无法在 Xray Core 运行时进行更新，请先停止代理"));
+        }
+
         let download_url = self.get_download_url(version).await?;
         let xray_dir = AppConfig::xray_dir()?;
+        
+        // 创建临时目录
+        let temp_dir = xray_dir.join("temp_update");
+        tokio::fs::create_dir_all(&temp_dir)
+            .await
+            .context("无法创建临时目录")?;
         
         // 下载文件
         let response = self.client
@@ -92,7 +114,7 @@ impl XrayManager {
             .context("无法读取下载内容")?;
 
         // 保存到临时文件
-        let temp_file = xray_dir.join("xray_temp.zip");
+        let temp_file = temp_dir.join("xray_temp.zip");
         let mut file = tokio::fs::File::create(&temp_file)
             .await
             .context("无法创建临时文件")?;
@@ -101,26 +123,54 @@ impl XrayManager {
             .await
             .context("无法写入临时文件")?;
 
-        // 解压文件
-        self.extract_xray(&temp_file, &xray_dir).await?;
+        // 解压到临时目录
+        self.extract_xray_to_temp(&temp_file, &temp_dir).await?;
 
-        // 删除临时文件
-        tokio::fs::remove_file(&temp_file)
+        // 原子性替换文件
+        self.replace_xray_executable(&temp_dir, &xray_dir).await?;
+
+        // 清理临时目录
+        tokio::fs::remove_dir_all(&temp_dir)
             .await
-            .context("无法删除临时文件")?;
+            .context("无法删除临时目录")?;
 
         Ok(())
     }
 
     /// 下载 Xray Core 更新（带进度回调）
+    /// 
+    /// # 参数
+    /// * `version` - 要下载的版本号
+    /// * `progress_callback` - 进度回调函数
+    /// 
+    /// # 返回值
+    /// * `Result<()>` - 下载结果
+    /// 
+    /// # 异常
+    /// * 当 Xray 正在运行时返回错误
+    /// * 当下载失败时返回错误
+    /// * 当文件替换失败时返回错误
     pub async fn download_update_with_progress<F>(&self, version: &str, mut progress_callback: F) -> Result<()>
     where
         F: FnMut(u64, u64, String) + Send,
     {
-        progress_callback(0, 100, "正在获取下载信息...".to_string());
+        progress_callback(0, 100, "检查运行状态...".to_string());
+        
+        // 检查 Xray 是否正在运行
+        if self.is_xray_running().await? {
+            return Err(anyhow::anyhow!("无法在 Xray Core 运行时进行更新，请先停止代理"));
+        }
+        
+        progress_callback(5, 100, "正在获取下载信息...".to_string());
         
         let download_url = self.get_download_url(version).await?;
         let xray_dir = AppConfig::xray_dir()?;
+        
+        // 创建临时目录
+        let temp_dir = xray_dir.join("temp_update");
+        tokio::fs::create_dir_all(&temp_dir)
+            .await
+            .context("无法创建临时目录")?;
         
         progress_callback(10, 100, "开始下载...".to_string());
         
@@ -136,7 +186,7 @@ impl XrayManager {
         let mut stream = response.bytes_stream();
 
         // 保存到临时文件
-        let temp_file = xray_dir.join("xray_temp.zip");
+        let temp_file = temp_dir.join("xray_temp.zip");
         let mut file = tokio::fs::File::create(&temp_file)
             .await
             .context("无法创建临时文件")?;
@@ -151,7 +201,7 @@ impl XrayManager {
             downloaded += chunk.len() as u64;
             
             if total_size > 0 {
-                let progress = (downloaded * 80 / total_size) + 10; // 10-90% 为下载进度
+                let progress = (downloaded * 75 / total_size) + 10; // 10-85% 为下载进度
                 progress_callback(progress, 100, format!("下载中... {:.1}MB/{:.1}MB", 
                     downloaded as f64 / 1024.0 / 1024.0, 
                     total_size as f64 / 1024.0 / 1024.0));
@@ -160,17 +210,22 @@ impl XrayManager {
             }
         }
 
-        progress_callback(90, 100, "正在解压文件...".to_string());
+        progress_callback(85, 100, "正在解压文件...".to_string());
 
-        // 解压文件
-        self.extract_xray(&temp_file, &xray_dir).await?;
+        // 解压到临时目录
+        self.extract_xray_to_temp(&temp_file, &temp_dir).await?;
+
+        progress_callback(90, 100, "备份原文件...".to_string());
+
+        // 原子性替换文件
+        self.replace_xray_executable(&temp_dir, &xray_dir).await?;
 
         progress_callback(95, 100, "清理临时文件...".to_string());
 
-        // 删除临时文件
-        tokio::fs::remove_file(&temp_file)
+        // 清理临时目录
+        tokio::fs::remove_dir_all(&temp_dir)
             .await
-            .context("无法删除临时文件")?;
+            .context("无法删除临时目录")?;
 
         progress_callback(100, 100, "更新完成！".to_string());
 
@@ -475,5 +530,115 @@ impl XrayManager {
         }
         
         Ok(())
+    }
+
+    /// 检查 Xray 是否正在运行
+    /// 
+    /// # 返回值
+    /// * `Result<bool>` - Xray 是否正在运行
+    async fn is_xray_running(&self) -> Result<bool> {
+        use crate::proxy::ProxyManager;
+        let proxy_manager = ProxyManager::instance();
+        Ok(proxy_manager.is_process_running())
+    }
+
+    /// 解压 Xray Core 到临时目录
+    /// 
+    /// # 参数
+    /// * `zip_path` - 压缩文件路径
+    /// * `temp_dir` - 临时目录路径
+    /// 
+    /// # 返回值
+    /// * `Result<()>` - 解压结果
+    async fn extract_xray_to_temp(&self, zip_path: &Path, temp_dir: &Path) -> Result<()> {
+        let file = std::fs::File::open(zip_path)
+            .context("无法打开压缩文件")?;
+
+        let mut archive = zip::ZipArchive::new(file)
+            .context("无法读取压缩文件")?;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)
+                .context("无法读取压缩文件内容")?;
+
+            let file_name = file.name();
+            
+            // 只提取 xray 可执行文件
+            if file_name == "xray" || file_name == "xray.exe" {
+                let output_path = temp_dir.join(file_name);
+                
+                let mut output_file = std::fs::File::create(&output_path)
+                    .context("无法创建输出文件")?;
+
+                std::io::copy(&mut file, &mut output_file)
+                    .context("无法复制文件内容")?;
+
+                // 在 Unix 系统上设置执行权限
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let mut perms = output_file.metadata()?.permissions();
+                    perms.set_mode(0o755);
+                    std::fs::set_permissions(&output_path, perms)?;
+                }
+
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 原子性替换 Xray 可执行文件
+    /// 
+    /// # 参数
+    /// * `temp_dir` - 临时目录路径
+    /// * `target_dir` - 目标目录路径
+    /// 
+    /// # 返回值
+    /// * `Result<()>` - 替换结果
+    async fn replace_xray_executable(&self, temp_dir: &Path, target_dir: &Path) -> Result<()> {
+        let executable_name = if cfg!(windows) { "xray.exe" } else { "xray" };
+        let temp_executable = temp_dir.join(executable_name);
+        let target_executable = target_dir.join(executable_name);
+        let backup_executable = target_dir.join(format!("{}.backup", executable_name));
+
+        // 检查新文件是否存在
+        if !temp_executable.exists() {
+            return Err(anyhow::anyhow!("临时目录中未找到 Xray 可执行文件"));
+        }
+
+        // 如果目标文件存在，先备份
+        if target_executable.exists() {
+            // 删除旧的备份文件（如果存在）
+            if backup_executable.exists() {
+                tokio::fs::remove_file(&backup_executable)
+                    .await
+                    .context("无法删除旧的备份文件")?;
+            }
+
+            // 备份当前文件
+            tokio::fs::rename(&target_executable, &backup_executable)
+                .await
+                .context("无法备份当前 Xray 文件")?;
+        }
+
+        // 移动新文件到目标位置
+        match tokio::fs::rename(&temp_executable, &target_executable).await {
+            Ok(_) => {
+                // 成功替换，删除备份文件
+                if backup_executable.exists() {
+                    let _ = tokio::fs::remove_file(&backup_executable).await;
+                }
+                Ok(())
+            }
+            Err(e) => {
+                // 替换失败，恢复备份文件
+                if backup_executable.exists() {
+                    let _ = tokio::fs::rename(&backup_executable, &target_executable).await;
+                }
+                Err(anyhow::anyhow!("文件替换失败: {}", e))
+            }
+        }
     }
 }

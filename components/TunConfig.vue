@@ -73,7 +73,6 @@
               <UInput
                 v-model="tunConfig.name"
                 placeholder="ruray-tun"
-                :disabled="tunStatus.is_running"
               />
             </UFormGroup>
             
@@ -82,7 +81,6 @@
               <UInput
                 v-model="tunConfig.address"
                 placeholder="192.168.55.10"
-                :disabled="tunStatus.is_running"
                 @blur="validateIpAddress"
                 :error="addressError"
               />
@@ -96,7 +94,6 @@
               <UInput
                 v-model="tunConfig.netmask"
                 placeholder="255.255.255.0"
-                :disabled="tunStatus.is_running"
                 @blur="validateNetmask"
                 :error="netmaskError"
               />
@@ -113,7 +110,6 @@
                 placeholder="1500"
                 :min="576"
                 :max="9000"
-                :disabled="tunStatus.is_running"
               />
             </UFormGroup>
           </div>
@@ -131,7 +127,6 @@
               <UInput
                 v-model="tunConfig.gateway"
                 placeholder="192.168.55.1"
-                :disabled="tunStatus.is_running"
                 @blur="validateGateway"
                 :error="gatewayError"
               />
@@ -148,8 +143,36 @@
                 placeholder="1"
                 :min="1"
                 :max="9999"
-                :disabled="tunStatus.is_running"
               />
+            </UFormGroup>
+            
+            <!-- 路由绕过IP -->
+            <UFormGroup :label="$t('tunConfig.bypassIps')" name="bypassIps" :help="$t('tunConfig.bypassIpsHelp')">
+              <div class="space-y-2">
+                <div v-for="(ip, index) in tunConfig.bypassIps" :key="index" class="flex items-center gap-2">
+                  <UInput
+                    v-model="tunConfig.bypassIps[index]"
+                    placeholder="192.168.1.0/24 或 8.8.8.8"
+                    class="flex-1"
+                  />
+                  <UButton
+                    icon="i-heroicons-trash"
+                    size="sm"
+                    color="red"
+                    variant="ghost"
+                    @click="removeBypassIp(index)"
+                  />
+                </div>
+                <UButton
+                  icon="i-heroicons-plus"
+                  size="sm"
+                  :color="selectedThemeColor"
+                  variant="outline"
+                  @click="addBypassIp"
+                >
+                  {{ $t('tunConfig.addBypassIp') }}
+                </UButton>
+              </div>
             </UFormGroup>
           </div>
         </UCard>
@@ -202,6 +225,7 @@ interface TunConfig {
   gateway: string
   metric: number
   enabled: boolean
+  bypassIps: string[]
 }
 
 /**
@@ -224,7 +248,8 @@ const tunConfig = reactive<TunConfig>({
   mtu: 1500,
   gateway: '192.168.55.1',
   metric: 1,
-  enabled: false
+  enabled: false,
+  bypassIps: []
 })
 
 const tunStatus = reactive<TunStatus>({
@@ -381,6 +406,20 @@ const refreshTunStatus = async () => {
 }
 
 /**
+ * 添加绕过IP地址
+ */
+const addBypassIp = () => {
+  tunConfig.bypassIps.push('')
+}
+
+/**
+ * 移除绕过IP地址
+ */
+const removeBypassIp = (index: number) => {
+  tunConfig.bypassIps.splice(index, 1)
+}
+
+/**
  * 重置为默认配置
  */
 const resetToDefault = () => {
@@ -391,7 +430,8 @@ const resetToDefault = () => {
     mtu: 1500,
     gateway: '192.168.55.1',
     metric: 1,
-    enabled: false
+    enabled: false,
+    bypassIps: []
   })
   
   // 清除验证错误

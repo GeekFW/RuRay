@@ -908,6 +908,21 @@ const startUpdate = async () => {
   updateStatus.value = ''
 
   try {
+    // 首先检查 Xray 是否正在运行
+    updateStatus.value = '检查运行状态...'
+    const proxyStatus = await invoke('get_proxy_status')
+    
+    if (proxyStatus.is_running) {
+      updateStatus.value = $t('header.updateStatus.runningError')
+      setTimeout(() => {
+        showUpdateDialog.value = false
+        isUpdating.value = false
+        updateProgress.value = 0
+        updateStatus.value = ''
+      }, 3000)
+      return
+    }
+
     // 检查是否有可用更新
     updateStatus.value = $t('header.updateStatus.checking')
     const availableUpdate = await invoke('check_xray_update')
@@ -939,6 +954,9 @@ const startUpdate = async () => {
     unlisten()
 
     // 下载完成后的处理
+    updateStatus.value = $t('header.updateStatus.completed')
+    updateProgress.value = 100
+    
     setTimeout(async () => {
       // 重新获取版本信息
       await getCurrentXrayVersion()
@@ -954,8 +972,29 @@ const startUpdate = async () => {
 
   } catch (error) {
     console.error('更新失败:', error)
-    updateStatus.value = `${$t('header.updateStatus.error')}: ${error}`
+    let errorMessage = error.toString()
+    
+    // 处理特定的错误消息
+    if (errorMessage.includes('无法在 Xray Core 运行时进行更新')) {
+      updateStatus.value = $t('header.updateStatus.runningError')
+    } else if (errorMessage.includes('下载失败')) {
+      updateStatus.value = $t('header.updateStatus.downloadError')
+    } else if (errorMessage.includes('文件替换失败')) {
+      updateStatus.value = $t('header.updateStatus.replaceError')
+    } else {
+      updateStatus.value = `${$t('header.updateStatus.error')}: ${errorMessage}`
+    }
+    
     isUpdating.value = false
+    
+    // 错误信息显示更长时间
+    setTimeout(() => {
+      if (!isUpdating.value) {
+        showUpdateDialog.value = false
+        updateProgress.value = 0
+        updateStatus.value = ''
+      }
+    }, 5000)
   }
 }
 

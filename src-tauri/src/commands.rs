@@ -179,8 +179,9 @@ pub async fn is_tun_running() -> Result<bool, String> {
 /// * `Result<TunConfig, String>` - TUN配置
 #[tauri::command]
 pub async fn get_tun_config() -> Result<TunConfig, String> {
-    let tun_manager = TunManager::instance();
-    Ok(tun_manager.get_config().await)
+    // 从配置文件中加载TUN配置，而不是从内存中的默认配置
+    let app_config = AppConfig::load().map_err(|e| e.to_string())?;
+    Ok(app_config.tun_config)
 }
 
 /// 更新TUN配置
