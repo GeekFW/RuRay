@@ -344,6 +344,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::get_logs,
             commands::get_log_info,
             commands::clear_log_file,
+            commands::clear_tun_log_file,
             // 文件系统操作
             commands::open_file_directory,
             // 语言配置

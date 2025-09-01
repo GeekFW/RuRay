@@ -12,6 +12,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager, path::BaseDirectory};
 use tokio::process::{Child, Command};
 use std::process::Stdio;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
 
 // 导入日志宏
 use crate::{log_info, log_warn, log_error};
@@ -31,6 +33,12 @@ use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken}
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
+
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Console::{GenerateConsoleCtrlEvent, CTRL_C_EVENT};
+
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::Foundation::TRUE;
 
 /// 为 gateway 字段提供默认值
 fn default_gateway() -> IpAddr {
@@ -348,6 +356,23 @@ impl TunManager {
         let server_address = self.get_current_server_address().await
             .context("获取当前服务器地址失败")?;
         
+        // 获取程序运行目录并创建日志文件路径
+        let app_dir = std::env::current_exe()
+            .context("获取程序路径失败")?
+            .parent()
+            .context("获取程序目录失败")?
+            .to_path_buf();
+        let log_file_path = app_dir.join("tun.log");
+        
+        // 创建或打开日志文件
+        let log_file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_file_path)
+            .context("创建tun日志文件失败")?;
+        
+        log_info!("tun2proxy日志将输出到: {}", log_file_path.display());
+        
         // 构建tun2proxy命令参数
         let mut cmd = Command::new(&tun2proxy_path);
         cmd.arg("--setup")  // 启动程序
@@ -359,8 +384,8 @@ impl TunManager {
             .arg(&proxy_url)
             .arg("--bypass") // 绕过代理的地址
             .arg(&server_address) // 当前激活服务器的IP地址
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stdout(Stdio::from(log_file.try_clone().context("克隆日志文件句柄失败")?))
+            .stderr(Stdio::from(log_file));
         
         // 添加用户配置的绕过IP地址
         for bypass_ip in &config.bypass_ips {
@@ -435,15 +460,60 @@ impl TunManager {
         if let Some(mut child) = child_opt {
             log_info!("正在停止tun2proxy进程，PID: {:?}", child.id());
             
-            // 尝试优雅地终止进程
-            if let Err(e) = child.kill().await {
-                log_warn!("终止tun2proxy进程失败: {}", e);
-            } else {
-                // 等待进程退出
-                if let Err(e) = child.wait().await {
-                    log_warn!("等待tun2proxy进程退出失败: {}", e);
+            // 尝试发送Ctrl+C信号优雅停止进程
+            let pid = child.id().unwrap_or(0);
+            let mut graceful_stop = false;
+            
+            #[cfg(target_os = "windows")]
+            {
+                // 在Windows上发送Ctrl+C事件
+                unsafe {
+                    let result = GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid);
+                    if result != 0 {
+                        log_info!("已向tun2proxy进程发送Ctrl+C信号，PID: {}", pid);
+                        graceful_stop = true;
+                        
+                        // 等待进程优雅退出（最多等待5秒）
+                        let mut wait_count = 0;
+                        while wait_count < 50 {
+                            match child.try_wait() {
+                                Ok(Some(_)) => {
+                                    log_info!("tun2proxy进程已优雅停止");
+                                    break;
+                                }
+                                Ok(None) => {
+                                    // 进程仍在运行，继续等待
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                    wait_count += 1;
+                                }
+                                Err(e) => {
+                                    log_warn!("检查进程状态失败: {}", e);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if wait_count >= 50 {
+                            log_warn!("进程未在预期时间内退出，将强制终止");
+                            graceful_stop = false;
+                        }
+                    } else {
+                        log_warn!("发送Ctrl+C信号失败，将使用强制终止");
+                    }
+                }
+            }
+            
+            // 如果优雅停止失败，则强制终止
+            if !graceful_stop {
+                if let Err(e) = child.kill().await {
+                    log_warn!("强制终止tun2proxy进程失败: {}", e);
                 } else {
-                    log_info!("tun2proxy进程已成功停止");
+                    // 等待进程退出
+                    if let Err(e) = child.wait().await {
+                        log_warn!("等待tun2proxy进程退出失败: {}", e);
+                    } else {
+                        log_info!("tun2proxy进程已强制停止");
+                    }
                 }
             }
         }
@@ -478,11 +548,49 @@ impl TunManager {
             if let Some(mut child) = process_guard.take() {
                 log_info!("正在同步停止tun2proxy进程，PID: {:?}", child.id());
                 
-                // 在同步上下文中终止进程
-                if let Err(e) = child.start_kill() {
-                    log_warn!("终止tun2proxy进程失败: {}", e);
-                } else {
-                    log_info!("tun2proxy进程终止信号已发送");
+                // 尝试发送Ctrl+C信号优雅停止进程
+                let pid = child.id().unwrap_or(0);
+                let mut graceful_stop = false;
+                
+                #[cfg(target_os = "windows")]
+                {
+                    // 在Windows上发送Ctrl+C事件
+                    unsafe {
+                        let result = GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid);
+                        if result != 0 {
+                            log_info!("已向tun2proxy进程发送Ctrl+C信号（同步），PID: {}", pid);
+                            graceful_stop = true;
+                            
+                            // 在同步上下文中等待一段时间
+                            std::thread::sleep(std::time::Duration::from_millis(2000));
+                            
+                            // 检查进程是否已退出
+                            match child.try_wait() {
+                                Ok(Some(_)) => {
+                                    log_info!("tun2proxy进程已优雅停止（同步）");
+                                }
+                                Ok(None) => {
+                                    log_warn!("进程未在预期时间内退出，将强制终止（同步）");
+                                    graceful_stop = false;
+                                }
+                                Err(e) => {
+                                    log_warn!("检查进程状态失败（同步）: {}", e);
+                                    graceful_stop = false;
+                                }
+                            }
+                        } else {
+                            log_warn!("发送Ctrl+C信号失败，将使用强制终止（同步）");
+                        }
+                    }
+                }
+                
+                // 如果优雅停止失败，则强制终止
+                if !graceful_stop {
+                    if let Err(e) = child.start_kill() {
+                        log_warn!("强制终止tun2proxy进程失败（同步）: {}", e);
+                    } else {
+                        log_info!("tun2proxy进程强制终止信号已发送（同步）");
+                    }
                 }
             }
         }

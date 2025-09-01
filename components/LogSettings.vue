@@ -116,6 +116,25 @@
                 {{ $t('logSettings.management.exportButton') }}
               </UButton>
             </div>
+            
+            <!-- 删除TUN日志 -->
+            <div class="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+              <div>
+                <h4 class="text-sm font-medium text-red-800 dark:text-red-200">{{ $t('logSettings.management.clearTunTitle') }}</h4>
+                <p class="text-xs text-red-600 dark:text-red-400 mt-1">
+                  {{ $t('logSettings.management.clearTunDesc') }}
+                </p>
+              </div>
+              <UButton
+                @click="showClearTunConfirm = true"
+                color="red"
+                variant="outline"
+                size="sm"
+              >
+                <Icon name="heroicons:trash" class="w-4 h-4 mr-1" />
+                {{ $t('logSettings.management.clearTunButton') }}
+              </UButton>
+            </div>
           </div>
         </UCard>
       </div>
@@ -168,6 +187,53 @@
         </template>
       </UCard>
     </UModal>
+    
+    <!-- 清理TUN日志确认对话框 -->
+    <UModal v-model="showClearTunConfirm">
+      <UCard>
+        <template #header>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ $t('logSettings.confirmClearTun.title') }}</h3>
+        </template>
+        
+        <div class="space-y-4">
+          <div class="flex items-start space-x-3">
+            <Icon name="heroicons:exclamation-triangle" class="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p class="text-gray-900 dark:text-white font-medium">{{ $t('logSettings.confirmClearTun.question') }}</p>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                {{ $t('logSettings.confirmClearTun.warning') }}
+              </p>
+            </div>
+          </div>
+          
+          <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+            <div class="text-sm text-gray-600 dark:text-gray-400">
+              <p><strong>{{ $t('logSettings.confirmClearTun.description') }}</strong></p>
+              <p class="mt-2">{{ $t('logSettings.confirmClearTun.fileLocation') }}</p>
+            </div>
+          </div>
+        </div>
+        
+        <template #footer>
+          <div class="flex justify-end space-x-2">
+            <UButton
+              variant="ghost"
+              @click="showClearTunConfirm = false"
+              :disabled="clearingTun"
+            >
+              {{ $t('common.cancel') }}
+            </UButton>
+            <UButton
+              color="red"
+              @click="clearTunLogFile"
+              :loading="clearingTun"
+            >
+              {{ $t('logSettings.confirmClearTun.confirmButton') }}
+            </UButton>
+          </div>
+        </template>
+      </UCard>
+    </UModal>
   </div>
 </template>
 
@@ -193,6 +259,8 @@ const loading = ref(false)
 const clearing = ref(false)
 const exporting = ref(false)
 const showClearConfirm = ref(false)
+const showClearTunConfirm = ref(false)
+const clearingTun = ref(false)
 
 const logPath = ref('')
 const logSize = ref(0)
@@ -346,6 +414,32 @@ const exportLogFile = async () => {
     })
   } finally {
     exporting.value = false
+  }
+}
+
+/**
+ * 清理TUN日志文件
+ */
+const clearTunLogFile = async () => {
+  clearingTun.value = true
+  try {
+    await invoke('clear_tun_log_file')
+    
+    showClearTunConfirm.value = false
+    toast.add({
+      title: $t('logSettings.messages.clearTunSuccess'),
+      description: $t('logSettings.messages.clearTunSuccessDesc'),
+      color: 'green'
+    })
+  } catch (error) {
+    console.error('清理TUN日志失败:', error)
+    toast.add({
+      title: $t('logSettings.messages.clearTunFailed'),
+      description: error instanceof Error ? error.message : $t('common.unknownError'),
+      color: 'red'
+    })
+  } finally {
+    clearingTun.value = false
   }
 }
 

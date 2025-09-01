@@ -914,6 +914,31 @@ pub async fn clear_log_file() -> Result<(), String> {
     Ok(())
 }
 
+/// 删除TUN设备日志文件
+#[tauri::command]
+pub async fn clear_tun_log_file() -> Result<(), String> {
+    // 获取程序运行目录
+    let app_dir = std::env::current_exe()
+        .map_err(|e| format!("获取程序路径失败: {}", e))?
+        .parent()
+        .ok_or("获取程序目录失败")?
+        .to_path_buf();
+    
+    let tun_log_path = app_dir.join("tun.log");
+    
+    if tun_log_path.exists() {
+        std::fs::remove_file(&tun_log_path)
+            .map_err(|e| format!("删除TUN日志文件失败: {}", e))?;
+    }
+    
+    // 重新创建空的TUN日志文件
+    std::fs::File::create(&tun_log_path)
+        .map_err(|e| format!("创建TUN日志文件失败: {}", e))?;
+    
+    log_info!("TUN日志文件已清理: {:?}", tun_log_path);
+    Ok(())
+}
+
 /// 打开文件目录
 #[tauri::command]
 pub async fn open_file_directory(file_path: String) -> Result<(), String> {

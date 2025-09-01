@@ -60,6 +60,12 @@
       "checking": "Checking for updates...",
       "latest": "Already latest version",
       "error": "Update check failed"
+    },
+    "closeConfirm": {
+      "title": "Close Application",
+      "message": "How would you like to close the application?",
+      "closeApp": "Close Directly",
+      "minimizeToTray": "Minimize to Tray"
     }
   },
   "loadingScreen": {
@@ -399,7 +405,10 @@
       "clearButton": "Clear Logs",
       "exportTitle": "Export Log File",
       "exportDesc": "Export current log file to specified location for analysis and backup.",
-      "exportButton": "Export Logs"
+      "exportButton": "Export Logs",
+      "clearTunTitle": "Delete TUN Device Logs",
+      "clearTunDesc": "Clear TUN device log file containing network connection and routing information. This operation cannot be undone.",
+      "clearTunButton": "Delete TUN Logs"
     },
     "confirmClear": {
       "title": "Confirm Clear Logs",
@@ -410,6 +419,14 @@
       "logEntries": "Log Entries",
       "confirmButton": "Confirm Clear"
     },
+    "confirmClearTun": {
+      "title": "Confirm Delete TUN Logs",
+      "question": "Are you sure you want to delete the TUN device log file?",
+      "warning": "This operation will delete all TUN device log records, including network connection and routing information. This operation cannot be undone.",
+      "description": "TUN device logs contain detailed records of network connections, routing configurations, and data transmission.",
+      "fileLocation": "Log file location: tun.log file in the program running directory",
+      "confirmButton": "Confirm Delete"
+    },
     "messages": {
       "getInfoFailed": "Get log information failed",
       "refreshSuccess": "Refresh successful",
@@ -419,7 +436,10 @@
       "clearSuccessDesc": "Log file cleared",
       "clearFailed": "Clear failed",
       "exportSuccess": "Export successful",
-      "exportFailed": "Export failed"
+      "exportFailed": "Export failed",
+      "clearTunSuccess": "TUN logs deleted successfully",
+      "clearTunSuccessDesc": "TUN device log file has been deleted and recreated",
+      "clearTunFailed": "TUN logs deletion failed"
     }
   },
   "tun": {

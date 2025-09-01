@@ -583,6 +583,40 @@
         </UCard>
       </div>
     </UModal>
+
+    <!-- 关闭确认对话框 -->
+    <UModal v-model="showCloseConfirmDialog">
+      <UCard>
+        <template #header>
+          <div class="flex items-center space-x-2">
+            <Icon name="heroicons:question-mark-circle" class="w-5 h-5 text-orange-500" />
+            <span>{{ $t('header.closeConfirm.title') }}</span>
+          </div>
+        </template>
+
+        <div class="space-y-4">
+          <p class="text-gray-600 dark:text-gray-400">
+            {{ $t('header.closeConfirm.message') }}
+          </p>
+        </div>
+
+        <template #footer>
+          <div class="flex justify-end space-x-2">
+            <UButton variant="ghost" @click="showCloseConfirmDialog = false">
+              {{ $t('common.cancel') }}
+            </UButton>
+            <UButton variant="outline" @click="minimizeToTray">
+              <Icon name="heroicons:minus" class="w-4 h-4 mr-1" />
+              {{ $t('header.closeConfirm.minimizeToTray') }}
+            </UButton>
+            <UButton color="red" @click="closeApp">
+              <Icon name="heroicons:x-mark" class="w-4 h-4 mr-1" />
+              {{ $t('header.closeConfirm.closeApp') }}
+            </UButton>
+          </div>
+        </template>
+      </UCard>
+    </UModal>
   </div>
 </template>
 
@@ -603,6 +637,7 @@ const appConfig = useAppConfig()
 // 对话框状态
 const showUpdateDialog = ref(false)
 const showSettings = ref(false)
+const showCloseConfirmDialog = ref(false)
 const activeSettingsTab = ref(0)
 
 // 更新状态
@@ -814,8 +849,21 @@ const toggleMaximize = async () => {
 }
 
 const closeWindow = async () => {
+  showCloseConfirmDialog.value = true
+}
+
+// 直接关闭程序
+const closeApp = async () => {
   const { getCurrentWindow } = await import('@tauri-apps/api/window')
   await getCurrentWindow().close()
+  showCloseConfirmDialog.value = false
+}
+
+// 最小化到托盘
+const minimizeToTray = async () => {
+  const { getCurrentWindow } = await import('@tauri-apps/api/window')
+  await getCurrentWindow().hide()
+  showCloseConfirmDialog.value = false
 }
 
 // 路由配置方法
@@ -1212,12 +1260,27 @@ const loadSettings = async () => {
     // 加载路由配置
     if (config.routing_config) {
       routingDomainStrategy.value = config.routing_config.domain_strategy || 'AsIs'
-      routingRules.value = config.routing_config.rules?.map(rule => ({
-        type: rule.rule_type || 'field',
-        ip: rule.ip || [],
-        domain: rule.domain || [],
-        outboundTag: rule.outbound_tag || 'proxy'
-      })) || [{
+      // 如果配置中有路由规则，则使用配置中的规则
+      if (config.routing_config.rules && config.routing_config.rules.length > 0) {
+        routingRules.value = config.routing_config.rules.map(rule => ({
+          type: rule.type || rule.rule_type || 'field',
+          ip: rule.ip || [],
+          domain: rule.domain || [],
+          outboundTag: rule.outboundTag || rule.outbound_tag || 'proxy'
+        }))
+      } else {
+        // 如果配置中没有路由规则，使用默认规则
+        routingRules.value = [{
+          type: 'field',
+          ip: ['geoip:private'],
+          domain: [],
+          outboundTag: 'direct'
+        }]
+      }
+    } else {
+      // 如果没有路由配置，使用默认配置
+      routingDomainStrategy.value = 'AsIs'
+      routingRules.value = [{
         type: 'field',
         ip: ['geoip:private'],
         domain: [],

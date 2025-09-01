@@ -60,6 +60,12 @@
       "checking": "更新を確認中...",
       "latest": "最新バージョンです",
       "error": "更新確認に失敗しました"
+    },
+    "closeConfirm": {
+      "title": "アプリケーションを閉じる",
+      "message": "アプリケーションをどのように閉じますか？",
+      "closeApp": "直接閉じる",
+      "minimizeToTray": "トレイに最小化"
     }
   },
   "loadingScreen": {
@@ -396,7 +402,10 @@
       "clearButton": "ログクリア",
       "exportTitle": "ログファイルエクスポート",
       "exportDesc": "現在のログファイルを指定した場所にエクスポートして分析とバックアップを行います。",
-      "exportButton": "ログエクスポート"
+      "exportButton": "ログエクスポート",
+      "clearTunTitle": "TUNデバイスログ削除",
+      "clearTunDesc": "ネットワーク接続とルーティング情報を含むTUNデバイスのログファイルをクリアします。この操作は元に戻せません。",
+      "clearTunButton": "TUNログ削除"
     },
     "confirmClear": {
       "title": "ログクリア確認",
@@ -407,6 +416,14 @@
       "logEntries": "ログエントリ",
       "confirmButton": "クリア確認"
     },
+    "confirmClearTun": {
+      "title": "TUNログ削除確認",
+      "question": "TUNデバイスのログファイルを削除してもよろしいですか？",
+      "warning": "この操作により、ネットワーク接続とルーティング情報を含むTUNデバイスのすべてのログ記録が削除されます。この操作は元に戻せません。",
+      "description": "TUNデバイスログには、ネットワーク接続、ルーティング設定、データ転送の詳細な記録が含まれています。",
+      "fileLocation": "ログファイルの場所：プログラム実行ディレクトリ内のtun.logファイル",
+      "confirmButton": "削除確認"
+    },
     "messages": {
       "getInfoFailed": "ログ情報取得失敗",
       "refreshSuccess": "更新成功",
@@ -416,7 +433,10 @@
       "clearSuccessDesc": "ログファイルがクリアされました",
       "clearFailed": "クリア失敗",
       "exportSuccess": "エクスポート成功",
-      "exportFailed": "エクスポート失敗"
+      "exportFailed": "エクスポート失敗",
+      "clearTunSuccess": "TUNログ削除成功",
+      "clearTunSuccessDesc": "TUNデバイスログファイルが削除され、再作成されました",
+      "clearTunFailed": "TUNログ削除失敗"
     }
   },
   "tun": {
