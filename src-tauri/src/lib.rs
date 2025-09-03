@@ -356,6 +356,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::is_log_stream_available,
             commands::clear_log_stream_buffer,
             commands::open_advanced_log_window,
+            // 应用程序控制
+            commands::open_app_directory,
+            commands::exit_app,
+            commands::open_webview_devtools,
+            commands::open_system_proxy,
         ])
         .setup(|app| {
             // 初始化应用配置

@@ -1,56 +1,90 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-slate-900">
+  <div class="min-h-screen bg-gray-50 dark:bg-slate-900" @contextmenu.prevent="onContextMenu">
     <!-- 如果是独立页面路由（如 advanced-log），直接显示页面内容 -->
     <NuxtPage v-if="isStandalonePage" />
-    
+
     <!-- 主应用内容 -->
     <template v-else>
       <!-- 启动加载动画 -->
       <LoadingScreen v-if="isLoading" />
-      
+
       <!-- 主应用界面 -->
       <div v-else-if="!isZenMode" class="h-screen flex flex-col">
         <!-- 顶部菜单栏 -->
         <AppHeader @toggle-zen-mode="toggleZenMode" />
-        
+
         <!-- 主内容区域 -->
         <div class="flex-1 flex overflow-hidden">
           <!-- 左侧服务器列表 -->
           <ServerList ref="serverListRef" class="w-100 border-r border-gray-200 dark:border-gray-700" />
-          
+
           <!-- 右侧日志区域 -->
           <LogViewer class="flex-1" />
         </div>
-        
+
         <!-- 底部状态栏 -->
         <StatusBar />
       </div>
-      
+
       <!-- 极简模式 (Zen Mode) -->
-      <Zen 
-        v-if="isZenMode"
-        :is-connected="appState.isConnected"
-        :active-server="appState.activeServer"
-        :upload-speed="appState.uploadSpeed"
-        :download-speed="appState.downloadSpeed"
-        :total-traffic="appState.totalTraffic"
-        :session-traffic="appState.sessionTraffic"
-        :uptime="appState.uptime"
-        :proxy-mode="appState.proxyMode"
-        @close="toggleZenMode"
-        @toggle-connection="toggleConnection"
-        @switch-server="switchServer"
-      />
+      <Zen v-if="isZenMode" :is-connected="appState.isConnected" :active-server="appState.activeServer"
+        :upload-speed="appState.uploadSpeed" :download-speed="appState.downloadSpeed"
+        :total-traffic="appState.totalTraffic" :session-traffic="appState.sessionTraffic" :uptime="appState.uptime"
+        :proxy-mode="appState.proxyMode" @close="toggleZenMode" @toggle-connection="toggleConnection"
+        @switch-server="switchServer" />
     </template>
-    
+
     <!-- 全局通知 -->
     <UNotifications />
+
+    <!-- 右键菜单 -->
+    <UContextMenu v-model="isContextMenuOpen" :virtual-element="virtualElement">
+      <div class="p-1 w-48 bg-white/80 dark:bg-gray-800/80">
+        <div class="space-y-1">
+          <button @click="toggleThemeMode"
+            class="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            {{ $t('contextMenu.toggleThemeMode') }}
+          </button>
+
+          <!-- 主题色子菜单 -->
+          <UDropdown :items="themeColorItems" :popper="{ placement: 'right-start' }" mode="hover">
+            <button
+              class="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
+              {{ $t('contextMenu.switchThemeColor') }}
+              <UIcon name="i-heroicons-chevron-right-20-solid" class="w-4 h-4" />
+            </button>
+          </UDropdown>
+
+          <button @click="openAppDirectory"
+            class="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            {{ $t('contextMenu.openAppDirectory') }}
+          </button>
+
+          <button @click="openSystemProxy"
+            class="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            {{ $t('contextMenu.openSystemProxy') }}
+          </button>
+
+          <button @click="openWebviewDevtools"
+            class="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            {{ $t('contextMenu.openDebugMode') }}
+          </button>
+
+          <div class="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+          <button @click="exitApp"
+            class="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 transition-colors">
+            {{ $t('contextMenu.exitApp') }}
+          </button>
+        </div>
+      </div>
+    </UContextMenu>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useMouse, useWindowScroll } from '@vueuse/core'
 // 国际化 - 使用 Nuxt 的自动导入
 const { t } = useI18n()
 
@@ -115,6 +149,47 @@ const sessionStartTraffic = ref<number>(0)
 // 组件引用
 const serverListRef = ref()
 
+// 右键菜单相关
+const { x, y } = useMouse()
+const { y: windowY } = useWindowScroll()
+const isContextMenuOpen = ref(false)
+const virtualElement = ref({ getBoundingClientRect: () => ({}) })
+
+// 主题色选项
+const themeColorItems = [
+  [{
+    label: $t('settings.theme.colors.red'),
+    icon: 'i-heroicons-stop-solid',
+    iconClass: 'text-red-500 dark:text-red-500',
+    click: () => changeThemeColor('red')
+  }, {
+    label: $t('settings.theme.colors.blue'),
+    icon: 'i-heroicons-stop-solid',
+    iconClass: 'text-blue-500 dark:text-blue-500',
+    click: () => changeThemeColor('blue')
+  }, {
+    label: $t('settings.theme.colors.green'),
+    icon: 'i-heroicons-stop-solid',
+    iconClass: 'text-green-500 dark:text-green-500',
+    click: () => changeThemeColor('green')
+  }, {
+    label: $t('settings.theme.colors.purple'),
+    icon: 'i-heroicons-stop-solid',
+    iconClass: 'text-purple-500 dark:text-purple-500',
+    click: () => changeThemeColor('purple')
+  }, {
+    label: $t('settings.theme.colors.orange'),
+    icon: 'i-heroicons-stop-solid',
+    iconClass: 'text-orange-500 dark:text-orange-500',
+    click: () => changeThemeColor('orange')
+  }, {
+    label: $t('settings.theme.colors.pink'),
+    icon: 'i-heroicons-stop-solid',
+    iconClass: 'text-pink-500 dark:text-pink-500',
+    click: () => changeThemeColor('pink')
+  }]
+]
+
 /**
  * 切换极简模式
  */
@@ -147,7 +222,7 @@ const toggleConnection = async () => {
     if (servers.value.length === 0) {
       await loadServers()
     }
-    
+
     if (servers.value.length > 0) {
       // 如果没有运行中的服务器，启动第一个服务器
       if (!runningServerId.value) {
@@ -161,11 +236,11 @@ const toggleConnection = async () => {
           appState.isConnected = true
           currentServerIndex.value = servers.value.findIndex(s => s.id === runningServerId.value)
           startNetworkMonitoring()
-          
+
           const toast = useToast()
           toast.add({
             title: t('common.connected'),
-        description: `${t('common.currentlyConnectedToServer')} "${runningServer.name}"`,
+            description: `${t('common.currentlyConnectedToServer')} "${runningServer.name}"`,
             icon: 'i-heroicons-check-circle',
             color: 'green'
           })
@@ -192,22 +267,22 @@ const switchServer = async () => {
     const toast = useToast()
     toast.add({
       title: t('common.noOtherServers'),
-        description: t('common.onlyOneServerConfig'),
+      description: t('common.onlyOneServerConfig'),
       icon: 'i-heroicons-information-circle',
       color: 'blue'
     })
     return
   }
-  
+
   // 按顺序切换到下一个服务器
   currentServerIndex.value = (currentServerIndex.value + 1) % servers.value.length
   const nextServer = servers.value[currentServerIndex.value]
-  
+
   // 先停止当前服务器
   if (runningServerId.value) {
     await stopProxy()
   }
-  
+
   // 启动新服务器
   await startProxy(nextServer.id)
 }
@@ -257,7 +332,7 @@ const loadServers = async () => {
 const startProxy = async (serverId: string) => {
   try {
     await invoke('start_proxy', { serverId })
-    
+
     // 更新状态
     runningServerId.value = serverId
     const server = servers.value.find(s => s.id === serverId)
@@ -265,12 +340,12 @@ const startProxy = async (serverId: string) => {
       server.status = 'connected'
       appState.activeServer = server
       appState.isConnected = true
-      
+
       // 更新当前服务器索引
       currentServerIndex.value = servers.value.findIndex(s => s.id === serverId)
-      
+
       startNetworkMonitoring()
-      
+
       const toast = useToast()
       toast.add({
         title: t('common.connectSuccess'),
@@ -281,7 +356,7 @@ const startProxy = async (serverId: string) => {
     }
   } catch (error) {
     console.error(t('common.startProxyFailed'), error)
-    
+
     const toast = useToast()
     toast.add({
       title: t('common.connectFailed'),
@@ -298,7 +373,7 @@ const startProxy = async (serverId: string) => {
 const stopProxy = async () => {
   try {
     await invoke('stop_proxy')
-    
+
     // 更新状态
     if (runningServerId.value) {
       const server = servers.value.find(s => s.id === runningServerId.value)
@@ -306,13 +381,13 @@ const stopProxy = async () => {
         server.status = 'disconnected'
       }
     }
-    
+
     runningServerId.value = null
     appState.activeServer = null
     appState.isConnected = false
-    
+
     stopNetworkMonitoring()
-    
+
     const toast = useToast()
     toast.add({
       title: $t('common.disconnected'),
@@ -322,7 +397,7 @@ const stopProxy = async () => {
     })
   } catch (error) {
     console.error($t('common.stopProxyFailed'), error)
-    
+
     const toast = useToast()
     toast.add({
       title: $t('common.disconnectFailed'),
@@ -341,36 +416,36 @@ const updateNetworkStats = async () => {
   if (networkMonitoringState.value.isUpdating) {
     return
   }
-  
+
   const now = Date.now()
   // 限制更新频率，最少间隔500ms
   if (now - networkMonitoringState.value.lastUpdateTime < 500) {
     return
   }
-  
+
   networkMonitoringState.value.isUpdating = true
-  
+
   try {
     const networkStats = await invoke('get_network_speed') as any
-    
+
     // 更新网络速度数据
     appState.uploadSpeed = networkStats.upload_speed || 0
     appState.downloadSpeed = networkStats.download_speed || 0
-    
+
     // 总流量（从应用启动开始）
     appState.totalTraffic = (networkStats.total_upload || 0) + (networkStats.total_download || 0)
-    
+
     // 会话流量（从当前连接开始）
     appState.sessionTraffic = Math.max(0, appState.totalTraffic - sessionStartTraffic.value)
-    
+
     // 重置错误计数
     networkMonitoringState.value.errorCount = 0
     networkMonitoringState.value.lastUpdateTime = now
-    
+
   } catch (error) {
     networkMonitoringState.value.errorCount++
     console.error(`${$t('common.getNetworkSpeedFailed')} (${networkMonitoringState.value.errorCount}):`, error)
-    
+
     // 如果连续失败超过5次，暂停更新30秒
     if (networkMonitoringState.value.errorCount >= 5) {
       console.warn($t('common.networkStatsFailedRetry'))
@@ -393,7 +468,7 @@ const startNetworkMonitoring = () => {
     errorCount: 0,
     lastUpdateTime: 0
   }
-  
+
   // 设置会话开始时的流量基准
   invoke('get_network_speed').then((networkStats: any) => {
     sessionStartTraffic.value = (networkStats.total_upload || 0) + (networkStats.total_download || 0)
@@ -401,7 +476,7 @@ const startNetworkMonitoring = () => {
     console.error($t('common.getInitialNetworkStatsFailed'), error)
     sessionStartTraffic.value = 0
   })
-  
+
   // 使用优化的网络数据更新
   networkTimer = setInterval(() => {
     // 如果错误次数过多，跳过此次更新
@@ -409,7 +484,7 @@ const startNetworkMonitoring = () => {
       updateNetworkStats()
     }
   }, 1000)
-  
+
   // 运行时间计时器 - 基于应用启动时间计算，降低更新频率
   uptimeTimer = setInterval(() => {
     appState.uptime = Math.floor((Date.now() - appStartTime.value) / 1000)
@@ -428,14 +503,14 @@ const stopNetworkMonitoring = () => {
     clearInterval(uptimeTimer)
     uptimeTimer = null
   }
-  
+
   // 重置监控状态
   networkMonitoringState.value = {
     isUpdating: false,
     errorCount: 0,
     lastUpdateTime: 0
   }
-  
+
   appState.uploadSpeed = 0
   appState.downloadSpeed = 0
   appState.sessionTraffic = 0  // 重置会话流量
@@ -451,7 +526,7 @@ const checkXrayCore = async () => {
   try {
     const exists = await invoke('check_xray_exists') as boolean
     const xrayPath = await invoke('get_xray_path') as string
-    
+
     if (!exists) {
       // 显示警告通知
       const toast = useToast()
@@ -524,10 +599,10 @@ const initializeProxyStatus = async () => {
         server.status = 'disconnected'
       })
     }
-    
+
     // 更新应用运行时间
     appState.uptime = Math.floor((Date.now() - appStartTime.value) / 1000)
-    
+
     // 同时加载代理模式
     await loadProxyMode()
   } catch (error) {
@@ -540,7 +615,7 @@ const initializeProxyStatus = async () => {
  */
 const handleProxyStatusChange = (event: any) => {
   const { is_running, current_server } = event.payload
-  
+
   // 更新所有服务器的状态 - 使用name字段比较，因为current_server是服务器名称
   servers.value.forEach(server => {
     if (server.name === current_server && is_running) {
@@ -557,12 +632,12 @@ const handleProxyStatusChange = (event: any) => {
       }
     }
   })
-  
+
   // 如果没有运行的服务器，重置runningServerId
   if (!is_running) {
     runningServerId.value = null
   }
-  
+
   console.log($t('common.proxyStatusUpdated'), { is_running, current_server })
 }
 
@@ -582,16 +657,16 @@ onMounted(async () => {
     isLoading.value = false
     return
   }
-  
+
   // 模拟加载时间
   await new Promise(resolve => setTimeout(resolve, 1000))
-  
+
   // 加载服务器列表
   await loadServers()
-  
+
   // 初始化代理状态
   await initializeProxyStatus()
-  
+
   // 监听代理状态变化事件
   try {
     const { listen } = await import('@tauri-apps/api/event')
@@ -600,10 +675,10 @@ onMounted(async () => {
   } catch (error) {
     console.error($t('common.listenProxyStatusChangeFailed'), error)
   }
-  
+
   // 检查 Xray Core
   await checkXrayCore()
-  
+
   isLoading.value = false
 })
 
@@ -612,6 +687,150 @@ useHead({
   title: 'RuRay - Xray Core Desktop Client'
 })
 
+/**
+ * 处理右键菜单
+ */
+const onContextMenu = () => {
+  const top = unref(y) - unref(windowY)
+  const left = unref(x)
+
+  virtualElement.value.getBoundingClientRect = () => ({
+    width: 0,
+    height: 0,
+    top,
+    left
+  })
+
+  isContextMenuOpen.value = true
+}
+
+/**
+ * 切换主题模式（明暗）
+ */
+const toggleThemeMode = () => {
+  const colorMode = useColorMode()
+  colorMode.preference = colorMode.preference === 'dark' ? 'light' : 'dark'
+  isContextMenuOpen.value = false
+}
+
+/**
+ * 切换主题颜色
+ */
+const changeThemeColor = (color: string) => {
+  const appConfig = useAppConfig()
+  appConfig.ui.primary = color
+
+  // 关闭右键菜单
+  isContextMenuOpen.value = false
+
+  // 显示切换成功提示
+  const toast = useToast()
+  toast.add({
+    title: '主题色已切换',
+    description: `已切换到${getColorName(color)}主题`,
+    icon: 'i-heroicons-swatch',
+    color: color as any
+  })
+}
+
+/**
+ * 获取颜色中文名称
+ */
+const getColorName = (color: string): string => {
+  const colorMap: Record<string, string> = {
+    red: '红色',
+    blue: '蓝色',
+    green: '绿色',
+    purple: '紫色',
+    orange: '橙色',
+    pink: '粉色'
+  }
+  return colorMap[color] || color
+}
+
+/**
+ * 打开应用目录
+ */
+const openAppDirectory = async () => {
+  try {
+    await invoke('open_app_directory')
+  } catch (error) {
+    console.error('打开应用目录失败:', error)
+    const toast = useToast()
+    toast.add({
+      title: '错误',
+      description: '无法打开应用目录',
+      icon: 'i-heroicons-exclamation-triangle',
+      color: 'red'
+    })
+  }
+  isContextMenuOpen.value = false
+}
+
+/**
+ * 开启webview调试模式
+ */
+const openWebviewDevtools = async () => {
+  try {
+    await invoke('open_webview_devtools')
+    const toast = useToast()
+    toast.add({
+      title: '调试模式已开启',
+      description: 'webview开发者工具已打开',
+      icon: 'i-heroicons-bug-ant',
+      color: 'green'
+    })
+  } catch (error) {
+    console.error('开启调试模式失败:', error)
+    const toast = useToast()
+    toast.add({
+      title: '错误',
+      description: '无法开启调试模式',
+      icon: 'i-heroicons-exclamation-triangle',
+      color: 'red'
+    })
+  }
+  isContextMenuOpen.value = false
+}
+
+/**
+ * 打开系统代理设置
+ */
+const openSystemProxy = async () => {
+  try {
+    await invoke('open_system_proxy')
+    const toast = useToast()
+    toast.add({
+      title: '系统代理设置已打开',
+      description: 'Windows网络代理设置页面已打开',
+      icon: 'i-heroicons-cog-6-tooth',
+      color: 'blue'
+    })
+  } catch (error) {
+    console.error('打开系统代理设置失败:', error)
+    const toast = useToast()
+    toast.add({
+      title: '错误',
+      description: '无法打开系统代理设置',
+      icon: 'i-heroicons-exclamation-triangle',
+      color: 'red'
+    })
+  }
+  isContextMenuOpen.value = false
+}
+
+/**
+ * 退出应用
+ */
+const exitApp = async () => {
+  try {
+    await invoke('exit_app')
+  } catch (error) {
+    console.error('退出应用失败:', error)
+  }
+  isContextMenuOpen.value = false
+}
+
 // 组件卸载时清理定时器
 onUnmounted(() => {
   stopNetworkMonitoring()
@@ -619,7 +838,8 @@ onUnmounted(() => {
 </script>
 
 <style>
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   overflow: hidden;

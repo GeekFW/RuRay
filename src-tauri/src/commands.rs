@@ -1027,7 +1027,7 @@ pub async fn subscribe_log_stream() -> Result<(), String> {
     let proxy_manager = ProxyManager::instance();
     
     // 检查是否有活跃的日志流
-    if let Some(receiver) = proxy_manager.get_log_receiver().await {
+    if let Some(_receiver) = proxy_manager.get_log_receiver().await {
         // 日志流已存在，直接返回成功
         Ok(())
     } else {
@@ -1107,4 +1107,140 @@ pub async fn open_advanced_log_window(app_handle: tauri::AppHandle) -> Result<()
     
     log_info!("核心日志查看器窗口已创建");
     Ok(())
+}
+
+/// 打开程序运行目录
+/// 在文件管理器中打开程序的运行目录
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 打开结果
+#[tauri::command]
+pub async fn open_app_directory() -> Result<(), String> {
+    use std::env;
+    use std::process::Command;
+    
+    // 获取程序运行目录
+    let current_dir = env::current_dir()
+        .map_err(|e| format!("获取当前目录失败: {}", e))?;
+    
+    // 根据操作系统打开文件管理器
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(current_dir)
+            .spawn()
+            .map_err(|e| format!("打开文件管理器失败: {}", e))?;
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(current_dir)
+            .spawn()
+            .map_err(|e| format!("打开文件管理器失败: {}", e))?;
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(current_dir)
+            .spawn()
+            .map_err(|e| format!("打开文件管理器失败: {}", e))?;
+    }
+    
+    log_info!("程序运行目录已在文件管理器中打开");
+    Ok(())
+}
+
+/// 开启webview调试模式
+/// 打开webview的开发者工具
+/// 
+/// # 参数
+/// * `app_handle` - Tauri应用句柄
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 开启结果
+#[tauri::command]
+pub async fn open_webview_devtools(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    
+    // 获取主窗口
+    if let Some(webview) = app_handle.get_webview_window("main") {
+        // 切换开发者工具
+        if let Err(e) = webview.with_webview(|webview| {
+            #[cfg(target_os = "linux")]
+            {
+                // Linux 使用 webkit2gtk
+                use webkit2gtk::WebViewExt;
+                webview.inner().get_inspector().show();
+            }
+            
+            #[cfg(target_os = "windows")]
+            {
+                // Windows 使用 webview2
+                use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2;
+                unsafe {
+                    let webview2: ICoreWebView2 = webview.controller().CoreWebView2().unwrap();
+                    webview2.OpenDevToolsWindow().ok();
+                }
+            }
+            
+            #[cfg(target_os = "macos")]
+            {
+                // macOS 使用 wkwebview
+                unsafe {
+                    let _: () = msg_send![webview.inner(), _setDeveloperExtrasEnabled: true];
+                    let _: () = msg_send![webview.inner(), _showInspector: webview.inner()];
+                }
+            }
+        }) {
+            return Err(format!("开启开发者工具失败: {}", e));
+        }
+        
+        log_info!("webview开发者工具已开启");
+        Ok(())
+    } else {
+        Err("未找到主窗口".to_string())
+    }
+}
+
+/// 打开系统代理设置
+/// 打开Windows的网络代理设置页面
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 打开结果
+#[tauri::command]
+pub async fn open_system_proxy() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        // 使用Windows设置URI打开网络代理设置页面
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "ms-settings:network-proxy"])
+            .spawn()
+            .map_err(|e| format!("打开系统代理设置失败: {}", e))?;
+        
+        log_info!("系统代理设置页面已打开");
+        Ok(())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("此功能仅在Windows系统上可用".to_string())
+    }
+}
+
+/// 退出程序
+/// 安全地退出应用程序
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 退出结果
+#[tauri::command]
+pub async fn exit_app() -> Result<(), String> {
+    log_info!("用户请求退出程序");
+    
+    // 停止代理服务
+    let _ = stop_proxy().await;
+    
+    // 退出程序
+    std::process::exit(0);
 }

@@ -13,7 +13,7 @@ use tauri::{AppHandle, Manager, path::BaseDirectory};
 use tokio::process::{Child, Command};
 use std::process::Stdio;
 use std::fs::OpenOptions;
-use std::path::PathBuf;
+
 
 // 导入日志宏
 use crate::{log_info, log_warn, log_error};
@@ -22,8 +22,7 @@ use crate::proxy::ProxyManager;
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt;
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
@@ -37,8 +36,7 @@ use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::System::Console::{GenerateConsoleCtrlEvent, CTRL_C_EVENT};
 
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::TRUE;
+
 
 /// 为 gateway 字段提供默认值
 fn default_gateway() -> IpAddr {

@@ -51,6 +51,26 @@
     "resume": "Resume",
     "visit": "Visit"
   },
+  "contextMenu": {
+    "toggleThemeMode": "Toggle Theme Mode",
+    "switchThemeColor": "Switch Theme Color",
+    "openAppDirectory": "Open App Directory",
+    "openDebugMode": "Open Debug Mode",
+    "openSystemProxy": "Open System Proxy",
+    "exitApp": "Exit App",
+    "themeModeSwitched": "Theme mode switched",
+    "currentThemeMode": "Current theme mode: {mode}",
+    "themeColorSwitched": "Theme color switched",
+    "currentThemeColor": "Current theme color: {color}",
+    "appDirectoryOpened": "App directory opened",
+    "appDirectoryOpenedDesc": "App directory has been opened in file manager",
+    "openAppDirectoryFailed": "Failed to open app directory",
+    "exitAppFailed": "Failed to exit app"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark"
+  },
   "header": {
     "title": "RuRay",
     "updateXrayCore": "Update Xray Core",
@@ -95,7 +115,15 @@
       "themeColor": "Theme Color",
       "followSystem": "Follow System",
       "lightMode": "Light Mode",
-      "darkMode": "Dark Mode"
+      "darkMode": "Dark Mode",
+      "colors": {
+        "red": "Red",
+        "blue": "Blue",
+        "green": "Green",
+        "purple": "Purple",
+        "orange": "Orange",
+        "pink": "Pink"
+      }
     },
     "proxy": {
       "title": "Proxy Settings",

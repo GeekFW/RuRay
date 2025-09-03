@@ -48,8 +48,33 @@
     "saveFailed": "保存失败",
     "saveConfig": "保存配置",
     "pause": "暂停",
+    "currentlyConnectedToServer": "当前连接到服务器",
+    "noAvailableServers": "没有可用的服务器",
+    "pleaseAddServerConfig": "请先添加服务器配置",
+    "noOtherServers": "没有其他服务器",
+    "onlyOneServerConfig": "只有一个服务器配置",
     "resume": "继续",
     "visit": "访问"
+  },
+  "contextMenu": {
+    "toggleThemeMode": "切换主题模式",
+    "switchThemeColor": "切换主题色",
+    "openAppDirectory": "打开程序运行路径",
+    "openDebugMode": "开启调试",
+    "openSystemProxy": "打开系统代理",
+    "exitApp": "退出程序",
+    "themeModeSwitched": "主题模式已切换",
+    "currentThemeMode": "当前主题模式：{mode}",
+    "themeColorSwitched": "主题色已切换",
+    "currentThemeColor": "当前主题色：{color}",
+    "appDirectoryOpened": "程序目录已打开",
+    "appDirectoryOpenedDesc": "程序运行路径已在文件管理器中打开",
+    "openAppDirectoryFailed": "打开程序目录失败",
+    "exitAppFailed": "退出程序失败"
+  },
+  "theme": {
+    "light": "浅色",
+    "dark": "深色"
   },
   "header": {
     "title": "RuRay",
@@ -99,7 +124,15 @@
       "themeColor": "主题色",
       "followSystem": "跟随系统",
       "lightMode": "浅色模式",
-      "darkMode": "深色模式"
+      "darkMode": "深色模式",
+      "colors": {
+        "red": "红色",
+        "blue": "蓝色",
+        "green": "绿色",
+        "purple": "紫色",
+        "orange": "橙色",
+        "pink": "粉色"
+      }
     },
     "proxy": {
       "title": "代理设置",

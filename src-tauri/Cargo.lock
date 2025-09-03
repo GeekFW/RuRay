@@ -3668,6 +3668,7 @@ dependencies = [
  "tun",
  "url",
  "uuid",
+ "webview2-com",
  "windows-sys 0.60.2",
  "winreg 0.52.0",
  "wintun 0.4.0",

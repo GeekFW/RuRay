@@ -12,7 +12,7 @@ use crate::{log_debug, log_error};
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    GetIfTable2, FreeMibTable, MIB_IF_TABLE2, MIB_IF_ROW2,
+    GetIfTable2, FreeMibTable, MIB_IF_TABLE2,
 };
 
 /// 网络接口统计信息
@@ -104,7 +104,7 @@ impl NetworkStatsManager {
                 std::thread::sleep(Duration::from_secs(1));
                 
                 // 直接调用同步版本的网络统计更新
-                let result = Self::update_network_stats_sync(
+                let _result = Self::update_network_stats_sync(
                     &last_snapshot,
                     &baseline_stats,
                     &current_speed,
@@ -298,7 +298,7 @@ impl NetworkStatsManager {
                 table.NumEntries as usize,
             );
 
-            for (i, entry) in entries.iter().enumerate() {
+            for (_i, entry) in entries.iter().enumerate() {
                 // 只统计活跃的网络接口
                 if entry.OperStatus == 1 { // IfOperStatusUp
                     // 转换接口名称
@@ -371,7 +371,7 @@ impl NetworkStatsManager {
                 table.NumEntries as usize,
             );
 
-            for (i, entry) in entries.iter().enumerate() {
+            for (_i, entry) in entries.iter().enumerate() {
                 // 只统计活跃的网络接口
                 if entry.OperStatus == 1 { // IfOperStatusUp
                     // 转换接口名称

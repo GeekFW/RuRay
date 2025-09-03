@@ -14,15 +14,14 @@ use std::time::Instant;
 use tokio::time::Duration;
 use tokio::process::Command as TokioCommand;
 use sysinfo::System;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::BufReader;
 use tokio::sync::broadcast;
 use std::collections::VecDeque;
 
 // 导入日志宏
 use crate::{log_info, log_error};
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+
 
 use crate::commands::{ProxyStatus, ServerInfo};
 use crate::config::AppConfig;

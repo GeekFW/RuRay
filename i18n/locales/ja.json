@@ -51,6 +51,22 @@
     "resume": "再開",
     "visit": "訪問"
   },
+  "contextMenu": {
+    "toggleThemeMode": "テーマモード切り替え",
+    "switchThemeColor": "テーマカラー切り替え",
+    "openAppDirectory": "アプリディレクトリを開く",
+    "openDebugMode": "デバッグモードを開く",
+    "openSystemProxy": "システムプロキシを開く",
+    "exitApp": "アプリを終了",
+    "themeModeSwitched": "テーマモードが切り替わりました",
+    "currentThemeMode": "現在のテーマモード：{mode}",
+    "themeColorSwitched": "テーマカラーが切り替わりました",
+    "currentThemeColor": "現在のテーマカラー：{color}",
+    "appDirectoryOpened": "アプリディレクトリが開かれました",
+    "appDirectoryOpenedDesc": "アプリディレクトリがファイルマネージャーで開かれました",
+    "openAppDirectoryFailed": "アプリディレクトリを開くのに失敗しました",
+    "exitAppFailed": "アプリの終了に失敗しました"
+  },
   "header": {
     "title": "RuRay",
     "updateXrayCore": "Xray Core更新",
@@ -95,7 +111,15 @@
       "themeColor": "テーマカラー",
       "followSystem": "システムに従う",
       "lightMode": "ライトモード",
-      "darkMode": "ダークモード"
+      "darkMode": "ダークモード",
+      "colors": {
+        "red": "赤",
+        "blue": "青",
+        "green": "緑",
+        "purple": "紫",
+        "orange": "オレンジ",
+        "pink": "ピンク"
+      }
     },
     "proxy": {
       "title": "プロキシ設定",
