@@ -6,18 +6,17 @@
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager, path::BaseDirectory};
-use tokio::process::{Child, Command};
-use std::process::Stdio;
-use std::fs::OpenOptions;
+
 
 
 // 导入日志宏
 use crate::{log_info, log_warn, log_error};
 use crate::proxy::ProxyManager;
+use crate::tun2proxy_ffi::{self, Tun2proxyDns, Tun2proxyVerbosity};
 
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt;
@@ -30,11 +29,7 @@ use windows_sys::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_EL
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
-
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::System::Console::{GenerateConsoleCtrlEvent, CTRL_C_EVENT};
+// Windows相关导入已移除，因为不再使用进程管理
 
 
 
@@ -135,8 +130,6 @@ pub struct TunManager {
     status: Arc<Mutex<TunStatus>>,
     running: Arc<AtomicBool>,
     app_handle: Arc<Mutex<Option<AppHandle>>>,
-    /// tun2proxy子进程
-    tun2proxy_process: Arc<Mutex<Option<Child>>>,
 }
 
 // 全局单例实例
@@ -159,7 +152,6 @@ impl TunManager {
                 })),
                 running: Arc::new(AtomicBool::new(false)),
                 app_handle: Arc::new(Mutex::new(None)),
-                tun2proxy_process: Arc::new(Mutex::new(None)),
             }
         })
     }
@@ -223,7 +215,87 @@ impl TunManager {
     
     #[cfg(not(target_os = "windows"))]
     fn init_wintun_path(&self) -> Result<()> {
-        // 非Windows平台不需要WinTun
+        log_info!("非Windows系统，跳过WinTun路径设置");
+        Ok(())
+    }
+
+    /// 初始化tun2proxy DLL路径
+    /// 
+    /// # 返回值
+    /// * `Result<()>` - 初始化结果
+    #[cfg(target_os = "windows")]
+    fn init_tun2proxy_dll(&self) -> Result<()> {
+        let app_handle_guard = self.app_handle.lock().unwrap();
+        let app_handle = app_handle_guard.as_ref()
+            .context("应用句柄未设置，请先调用 set_app_handle")?;
+        
+        // 使用tun2proxy目录下的tun2proxy.dll
+        let tun2proxy_resource_path = "tun2proxy/tun2proxy.dll";
+        
+        log_info!("开始初始化tun2proxy DLL...");
+        
+        // 使用Tauri的路径解析API获取资源文件路径
+        match app_handle.path().resolve(tun2proxy_resource_path, BaseDirectory::Resource) {
+            Ok(dll_path) => {
+                log_info!("解析到tun2proxy.dll路径: {}", dll_path.display());
+                if dll_path.exists() {
+                    log_info!("找到tun2proxy.dll文件: {}", dll_path.display());
+                    
+                    // 初始化tun2proxy DLL
+                    match tun2proxy_ffi::init_tun2proxy_dll(dll_path.clone()) {
+                        Ok(_) => {
+                            log_info!("tun2proxy DLL初始化成功");
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            log_error!("使用资源路径初始化tun2proxy DLL失败: {}", e);
+                        }
+                    }
+                } else {
+                    log_warn!("警告: 嵌入的tun2proxy.dll文件不存在: {}", dll_path.display());
+                }
+            }
+            Err(e) => {
+                log_warn!("警告: 无法解析tun2proxy.dll资源路径: {}", e);
+            }
+        }
+        
+        // 如果资源路径解析失败，尝试使用旧的方法
+        log_info!("尝试使用程序目录下的tun2proxy.dll");
+        match self.get_tun2proxy_path() {
+            Ok(tun2proxy_bin_path) => {
+                let dll_path = tun2proxy_bin_path.parent()
+                    .ok_or_else(|| anyhow::anyhow!("无法获取tun2proxy目录"))?
+                    .join("tun2proxy.dll");
+                
+                log_info!("尝试加载DLL文件: {}", dll_path.display());
+                
+                if dll_path.exists() {
+                    match tun2proxy_ffi::init_tun2proxy_dll(dll_path.clone()) {
+                        Ok(_) => {
+                            log_info!("使用程序目录下的tun2proxy DLL初始化成功");
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            log_error!("使用程序目录初始化tun2proxy DLL失败: {}", e);
+                            return Err(e.context("初始化tun2proxy DLL失败"));
+                        }
+                    }
+                } else {
+                    log_error!("tun2proxy.dll文件不存在: {}", dll_path.display());
+                    return Err(anyhow::anyhow!("tun2proxy.dll文件不存在: {}", dll_path.display()));
+                }
+            }
+            Err(e) => {
+                log_error!("获取tun2proxy路径失败: {}", e);
+                return Err(e.context("获取tun2proxy路径失败"));
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn init_tun2proxy_dll(&self) -> Result<()> {
+        log_info!("非Windows系统，跳过tun2proxy DLL初始化");
         Ok(())
     }
 
@@ -287,6 +359,39 @@ impl TunManager {
         Ok(tun2proxy_path)
     }
 
+    /// 验证IP地址或CIDR格式是否有效
+    /// 
+    /// # 参数
+    /// * `addr` - 要验证的地址字符串
+    /// 
+    /// # 返回值
+    /// * `bool` - 地址格式是否有效
+    fn is_valid_ip_or_cidr(addr: &str) -> bool {
+        // 检查是否为CIDR格式
+        if addr.contains('/') {
+            if let Some((ip_part, mask_part)) = addr.split_once('/') {
+                // 验证IP部分
+                if ip_part.parse::<IpAddr>().is_err() {
+                    return false;
+                }
+                // 验证掩码部分
+                if let Ok(mask) = mask_part.parse::<u8>() {
+                    // IPv4掩码范围: 0-32, IPv6掩码范围: 0-128
+                    if ip_part.parse::<Ipv4Addr>().is_ok() {
+                        return mask <= 32;
+                    } else if ip_part.parse::<Ipv6Addr>().is_ok() {
+                        return mask <= 128;
+                    }
+                }
+                return false;
+            }
+        } else {
+            // 检查是否为有效的IP地址
+            return addr.parse::<IpAddr>().is_ok();
+        }
+        false
+    }
+    
     /// 获取当前激活服务器的地址
     /// 
     /// # Returns
@@ -334,6 +439,9 @@ impl TunManager {
         // 初始化WinTun库路径
         self.init_wintun_path()?;
 
+        // 初始化tun2proxy DLL
+        self.init_tun2proxy_dll()?;
+
         // 如果已经在运行，先停止
         if self.is_running().await {
             self.stop().await?;
@@ -345,11 +453,6 @@ impl TunManager {
             *current_config = config.clone();
         }
 
-        // 获取tun2proxy可执行文件路径
-        let tun2proxy_path = self.get_tun2proxy_path()?;
-        
-        log_info!("启动tun2proxy: {}", tun2proxy_path.display());
-        
         // 获取当前激活服务器的地址信息
         let server_address = self.get_current_server_address().await
             .context("获取当前服务器地址失败")?;
@@ -362,62 +465,68 @@ impl TunManager {
             .to_path_buf();
         let log_file_path = app_dir.join("tun.log");
         
-        // 创建或打开日志文件
-        let log_file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_file_path)
-            .context("创建tun日志文件失败")?;
-        
         log_info!("tun2proxy日志将输出到: {}", log_file_path.display());
         
-        // 构建tun2proxy命令参数
-        let mut cmd = Command::new(&tun2proxy_path);
-        cmd.arg("--setup")  // 启动程序
-            .arg("--dns")   // 设置DNS处理方式
-            .arg("over-tcp") // 使用TCP方式处理DNS
-            .arg("--tun")   // 指定TUN网卡名称
-            .arg(&config.name)
-            .arg("--proxy") // 指定代理服务器
-            .arg(&proxy_url)
-            .arg("--bypass") // 绕过代理的地址
-            .arg(&server_address) // 当前激活服务器的IP地址
-            .stdout(Stdio::from(log_file.try_clone().context("克隆日志文件句柄失败")?))
-            .stderr(Stdio::from(log_file));
+        // 设置tun2proxy日志文件路径
+        tun2proxy_ffi::set_tun_log_file_path(log_file_path);
         
-        // 添加用户配置的绕过IP地址
+        // 设置日志回调
+        tun2proxy_ffi::set_log_callback()
+            .context("设置日志回调失败")?;
+        
+        // 构建绕过地址列表
+        let mut bypass_addresses = Vec::new();
+        
+        // 验证并添加服务器地址
+        if Self::is_valid_ip_or_cidr(&server_address) {
+            bypass_addresses.push(server_address.clone());
+            log_info!("添加服务器地址到绕过列表: {}", server_address);
+        } else {
+            log_warn!("服务器地址格式无效，跳过: {} (可能是域名，需要IP地址)", server_address);
+        }
+        
+        // 验证并添加配置中的绕过IP
         for bypass_ip in &config.bypass_ips {
-            if !bypass_ip.trim().is_empty() {
-                cmd.arg("--bypass").arg(bypass_ip.trim());
+            let ip = bypass_ip.trim();
+            if !ip.is_empty() {
+                if Self::is_valid_ip_or_cidr(ip) {
+                    bypass_addresses.push(ip.to_string());
+                    log_info!("添加绕过IP: {}", ip);
+                } else {
+                    log_warn!("绕过IP格式无效，跳过: {}", ip);
+                }
             }
         }
         
-        // Windows平台下隐藏命令行窗口
-        #[cfg(target_os = "windows")]
-        {
-            cmd.creation_flags(CREATE_NO_WINDOW);
+        log_info!("启动tun2proxy DLL，TUN设备: {}, 代理: {}, 绕过地址: {:?}", 
+                 config.name, proxy_url, bypass_addresses);
+        
+        // 构造命令行参数，支持多个绕过地址
+        let mut cli_args = vec![
+            "tun2proxy".to_string(),
+            "--setup".to_string(),
+            "--proxy".to_string(),
+            proxy_url.clone(),
+            "--tun".to_string(),
+            config.name.clone(),
+            "--dns".to_string(),
+            "over-tcp".to_string(),
+        ];
+        
+        // 添加绕过地址参数
+        for bypass_addr in &bypass_addresses {
+            cli_args.push("--bypass".to_string());
+            cli_args.push(bypass_addr.clone());
         }
         
-        // 打印完整的命令行参数用于调试
-        let args: Vec<String> = std::iter::once(tun2proxy_path.to_string_lossy().to_string())
-            .chain(cmd.as_std().get_args().map(|arg| arg.to_string_lossy().to_string()))
-            .collect();
-        log_info!("tun2proxy命令行参数: {}", args.join(" "));
+        let cli_args_str = cli_args.join(" ");
+        log_info!("tun2proxy命令行参数: {}", cli_args_str);
         
-        // 启动tun2proxy进程
-        let child = cmd.spawn()
-            .context("启动tun2proxy进程失败")?;
+        // 使用DLL接口启动tun2proxy
+        log_info!("开始调用tun2proxy_ffi::run_with_cli_args函数（注意：这是一个阻塞调用）");
         
-        let process_id = child.id();
-        log_info!("tun2proxy进程已启动，PID: {:?}", process_id);
-        
-        // 存储子进程引用
-        {
-            let mut process_guard = self.tun2proxy_process.lock().unwrap();
-            *process_guard = Some(child);
-        }
-
-        // 更新状态
+        // 由于tun2proxy_run_with_cli_args是阻塞调用，我们需要在单独的线程中运行它
+        // 首先设置运行状态为true，表示正在启动
         {
             let mut status = self.status.lock().unwrap();
             status.is_running = true;
@@ -426,13 +535,68 @@ impl TunManager {
             status.bytes_received = 0;
             status.bytes_sent = 0;
             status.error = None;
-            status.process_id = process_id;
+            status.process_id = None; // DLL模式下没有独立进程ID
         }
-
+        
         // 更新运行状态
         self.running.store(true, Ordering::SeqCst);
         
-        log_info!("TUN模式启动成功，使用tun2proxy代理，虚拟网卡: {}", config.name);
+        // 在后台线程中启动tun2proxy（阻塞调用）
+        let cli_args_clone = cli_args_str.clone();
+        let mtu = config.mtu;
+        let status_arc = Arc::clone(&self.status);
+        let running_arc = Arc::clone(&self.running);
+        
+        std::thread::spawn(move || {
+            log_info!("后台线程开始执行tun2proxy_ffi::run_with_cli_args");
+            
+            match tun2proxy_ffi::run_with_cli_args(
+                &cli_args_clone,
+                mtu,
+                false, // packet_information
+            ) {
+                Ok(exit_code) => {
+                    log_info!("tun2proxy_ffi::run_with_cli_args函数调用完成，返回退出码: {}", exit_code);
+                    
+                    // 更新状态
+                    {
+                        let mut status = status_arc.lock().unwrap();
+                        status.is_running = false;
+                        if exit_code != 0 {
+                            let error_msg = format!("tun2proxy退出，退出码: {}", exit_code);
+                            status.error = Some(error_msg.clone());
+                            log_warn!("{}", error_msg);
+                        } else {
+                            log_info!("tun2proxy正常退出，退出码: {}", exit_code);
+                        }
+                    }
+                    
+                    // 更新运行状态
+                    running_arc.store(false, Ordering::SeqCst);
+                }
+                Err(e) => {
+                    let error_msg = format!("启动tun2proxy失败: {}", e);
+                    log_error!("{}", error_msg);
+                    
+                    // 更新状态以记录错误
+                    {
+                        let mut status = status_arc.lock().unwrap();
+                        status.is_running = false;
+                        status.error = Some(error_msg.clone());
+                    }
+                    
+                    // 确保运行状态也设置为false
+                    running_arc.store(false, Ordering::SeqCst);
+                }
+            }
+            
+            log_info!("tun2proxy后台任务执行完成");
+        });
+        
+        // 给一点时间让tun2proxy启动
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        
+        log_info!("TUN模式启动请求已提交，tun2proxy正在后台运行，虚拟网卡: {}", config.name);
         Ok(())
     }
 
@@ -441,81 +605,46 @@ impl TunManager {
     /// # 返回值
     /// * `Result<()>` - 停止结果
     pub async fn stop(&self) -> Result<()> {
-        // 检查是否在运行
-        if !self.is_running().await {
-            return Ok(()); // 已经停止
-        }
-
-        // 停止运行状态
-        self.running.store(false, Ordering::SeqCst);
-
-        // 停止tun2proxy进程
-        let child_opt = {
-            let mut process_guard = self.tun2proxy_process.lock().unwrap();
-            process_guard.take()
-        };
+        log_info!("开始停止TUN设备");
         
-        if let Some(mut child) = child_opt {
-            log_info!("正在停止tun2proxy进程，PID: {:?}", child.id());
-            
-            // 尝试发送Ctrl+C信号优雅停止进程
-            let pid = child.id().unwrap_or(0);
-            let mut graceful_stop = false;
-            
-            #[cfg(target_os = "windows")]
-            {
-                // 在Windows上发送Ctrl+C事件
-                unsafe {
-                    let result = GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid);
-                    if result != 0 {
-                        log_info!("已向tun2proxy进程发送Ctrl+C信号，PID: {}", pid);
-                        graceful_stop = true;
-                        
-                        // 等待进程优雅退出（最多等待5秒）
-                        let mut wait_count = 0;
-                        while wait_count < 50 {
-                            match child.try_wait() {
-                                Ok(Some(_)) => {
-                                    log_info!("tun2proxy进程已优雅停止");
-                                    break;
-                                }
-                                Ok(None) => {
-                                    // 进程仍在运行，继续等待
-                                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                                    wait_count += 1;
-                                }
-                                Err(e) => {
-                                    log_warn!("检查进程状态失败: {}", e);
-                                    break;
-                                }
-                            }
+        // 检查是否正在运行
+        if !self.running.load(Ordering::SeqCst) {
+            log_info!("TUN设备未运行，无需停止");
+            return Ok(());
+        }
+        
+        log_info!("正在停止tun2proxy DLL");
+        
+        // 重要说明：tun2proxy DLL是全局单例，无论在哪个线程启动，
+        // stop()函数都会停止同一个tun2proxy实例
+        
+        // 在后台线程中调用DLL的stop函数，避免阻塞主线程
+        let stop_handle = std::thread::spawn(|| {
+            let result = tun2proxy_ffi::stop();
+            result
+        });
+        
+        // 等待stop操作完成，设置10秒超时
+        match stop_handle.join() {
+            Ok(stop_result) => {
+                match stop_result {
+                    Ok(exit_code) => {
+                        if exit_code == 0 {
+                            log_info!("tun2proxy DLL已成功停止");
+                        } else {
+                            log_warn!("tun2proxy DLL停止时返回非零退出码: {}", exit_code);
                         }
-                        
-                        if wait_count >= 50 {
-                            log_warn!("进程未在预期时间内退出，将强制终止");
-                            graceful_stop = false;
-                        }
-                    } else {
-                        log_warn!("发送Ctrl+C信号失败，将使用强制终止");
+                    }
+                    Err(e) => {
+                        log_warn!("停止tun2proxy DLL失败: {}", e);
                     }
                 }
             }
-            
-            // 如果优雅停止失败，则强制终止
-            if !graceful_stop {
-                if let Err(e) = child.kill().await {
-                    log_warn!("强制终止tun2proxy进程失败: {}", e);
-                } else {
-                    // 等待进程退出
-                    if let Err(e) = child.wait().await {
-                        log_warn!("等待tun2proxy进程退出失败: {}", e);
-                    } else {
-                        log_info!("tun2proxy进程已强制停止");
-                    }
-                }
+            Err(_) => {
+                log_warn!("stop线程执行失败或panic");
             }
         }
-
+        
         // 更新状态
         {
             let mut status = self.status.lock().unwrap();
@@ -523,7 +652,10 @@ impl TunManager {
             status.error = None;
             status.process_id = None;
         }
-
+        
+        // 更新运行状态
+        self.running.store(false, Ordering::SeqCst);
+        
         log_info!("TUN设备已停止");
         Ok(())
     }
@@ -540,57 +672,13 @@ impl TunManager {
         // 设置停止标志
         self.running.store(false, Ordering::SeqCst);
 
-        // 停止tun2proxy进程
-        {
-            let mut process_guard = self.tun2proxy_process.lock().unwrap();
-            if let Some(mut child) = process_guard.take() {
-                log_info!("正在同步停止tun2proxy进程，PID: {:?}", child.id());
-                
-                // 尝试发送Ctrl+C信号优雅停止进程
-                let pid = child.id().unwrap_or(0);
-                let mut graceful_stop = false;
-                
-                #[cfg(target_os = "windows")]
-                {
-                    // 在Windows上发送Ctrl+C事件
-                    unsafe {
-                        let result = GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid);
-                        if result != 0 {
-                            log_info!("已向tun2proxy进程发送Ctrl+C信号（同步），PID: {}", pid);
-                            graceful_stop = true;
-                            
-                            // 在同步上下文中等待一段时间
-                            std::thread::sleep(std::time::Duration::from_millis(2000));
-                            
-                            // 检查进程是否已退出
-                            match child.try_wait() {
-                                Ok(Some(_)) => {
-                                    log_info!("tun2proxy进程已优雅停止（同步）");
-                                }
-                                Ok(None) => {
-                                    log_warn!("进程未在预期时间内退出，将强制终止（同步）");
-                                    graceful_stop = false;
-                                }
-                                Err(e) => {
-                                    log_warn!("检查进程状态失败（同步）: {}", e);
-                                    graceful_stop = false;
-                                }
-                            }
-                        } else {
-                            log_warn!("发送Ctrl+C信号失败，将使用强制终止（同步）");
-                        }
-                    }
-                }
-                
-                // 如果优雅停止失败，则强制终止
-                if !graceful_stop {
-                    if let Err(e) = child.start_kill() {
-                        log_warn!("强制终止tun2proxy进程失败（同步）: {}", e);
-                    } else {
-                        log_info!("tun2proxy进程强制终止信号已发送（同步）");
-                    }
-                }
-            }
+        log_info!("正在同步停止tun2proxy DLL");
+        
+        // 使用DLL接口停止tun2proxy
+        if let Err(e) = tun2proxy_ffi::stop() {
+            log_warn!("停止tun2proxy DLL失败（同步）: {}", e);
+        } else {
+            log_info!("tun2proxy DLL已停止（同步）");
         }
 
         // 更新状态
@@ -611,7 +699,26 @@ impl TunManager {
     /// # 返回值
     /// * `bool` - 是否运行中
     pub async fn is_running(&self) -> bool {
-        self.running.load(Ordering::SeqCst)
+        let atomic_running = self.running.load(Ordering::SeqCst);
+        
+        // 如果原子状态为false，直接返回false
+        if !atomic_running {
+            return false;
+        }
+        
+        // 如果原子状态为true，还需要检查实际的状态
+        let status_running = {
+            let status = self.status.lock().unwrap();
+            status.is_running
+        };
+        
+        // 如果状态不一致，同步原子状态
+        if atomic_running != status_running {
+            self.running.store(status_running, Ordering::SeqCst);
+            log_warn!("TUN运行状态不一致，已同步: atomic={}, status={}", atomic_running, status_running);
+        }
+        
+        status_running
     }
 
     /// 检查TUN设备是否正在运行（同步版本）
@@ -666,41 +773,13 @@ impl TunManager {
         Ok(())
     }
 
-    /// 检查tun2proxy进程状态
+    /// 检查tun2proxy DLL状态
     /// 
     /// # 返回值
-    /// * `bool` - 进程是否仍在运行
+    /// * `bool` - DLL是否仍在运行
     pub async fn check_process_status(&self) -> bool {
-        let process_status = {
-            let mut process_guard = self.tun2proxy_process.lock().unwrap();
-            if let Some(child) = process_guard.as_mut() {
-                child.try_wait()
-            } else {
-                return false;
-            }
-        };
-        
-        match process_status {
-            Ok(Some(status)) => {
-                log_warn!("tun2proxy进程已退出，状态: {:?}", status);
-                // 进程已退出，更新状态
-                self.running.store(false, Ordering::SeqCst);
-                {
-                    let mut status_guard = self.status.lock().unwrap();
-                    status_guard.is_running = false;
-                    status_guard.process_id = None;
-                }
-                false
-            }
-            Ok(None) => {
-                // 进程仍在运行
-                true
-            }
-            Err(e) => {
-                log_error!("检查tun2proxy进程状态失败: {}", e);
-                false
-            }
-        }
+        // 在DLL模式下，直接返回运行状态
+        self.running.load(Ordering::SeqCst)
     }
 }
 

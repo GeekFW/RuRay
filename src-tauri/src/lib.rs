@@ -15,6 +15,7 @@ mod network;
 mod proxy;
 mod system;
 mod tun;
+mod tun2proxy_ffi;
 mod xray;
 
 /// 构建系统托盘菜单

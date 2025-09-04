@@ -1,5 +1,5 @@
 ## 注释规范
-1、所有的rust源文件顶部增加版权声明， Project: RuRay, Author: Lander, CreateAt: 创建时间
+1、所有的rust源文件顶部增加版权声明， Project: RuRay, Author: Lander, CreateAt: 创建时间，创建时间通过MCP Time获取，格式为：2023-01-01 12:00:00
 2、所有公共方法增加函数说明和注释，包括参数、返回值、异常等
 3、所有的结构体和枚举增加说明注释，包括字段、方法等
 
