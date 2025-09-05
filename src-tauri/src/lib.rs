@@ -362,6 +362,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::exit_app,
             commands::open_webview_devtools,
             commands::open_system_proxy,
+            // 配置管理
+            commands::get_config,
+            commands::update_tun_log_setting,
         ])
         .setup(|app| {
             // 初始化应用配置

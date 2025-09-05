@@ -473,6 +473,8 @@
     },
     "management": {
       "title": "日志管理",
+      "tunLogTitle": "TUN设备日志",
+      "tunLogDesc": "启用后，TUN设备启动时将记录详细日志到 tun.log 文件中",
       "clearTitle": "清理日志文件",
       "clearDesc": "清空现有的日志内容，不影响后续日志写入。此操作不可撤销。",
       "clearButton": "清理日志",
@@ -512,7 +514,11 @@
       "exportFailed": "导出失败",
       "clearTunSuccess": "TUN日志删除成功",
       "clearTunSuccessDesc": "TUN设备日志文件已删除并重新创建",
-      "clearTunFailed": "TUN日志删除失败"
+      "clearTunFailed": "TUN日志删除失败",
+      "tunLogUpdateSuccess": "TUN日志设置更新成功",
+      "tunLogEnabledDesc": "TUN设备日志已启用，将记录到 tun.log 文件",
+      "tunLogDisabledDesc": "TUN设备日志已禁用",
+      "tunLogUpdateFailed": "TUN日志设置更新失败"
     }
   },
   "tun": {

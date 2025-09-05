@@ -436,7 +436,9 @@
       "exportButton": "Export Logs",
       "clearTunTitle": "Delete TUN Device Logs",
       "clearTunDesc": "Clear TUN device log file containing network connection and routing information. This operation cannot be undone.",
-      "clearTunButton": "Delete TUN Logs"
+      "clearTunButton": "Delete TUN Logs",
+      "tunLogTitle": "TUN Device Logging",
+      "tunLogDesc": "Enable or disable TUN device logging. When enabled, detailed network connection and routing information will be recorded."
     },
     "confirmClear": {
       "title": "Confirm Clear Logs",
@@ -467,7 +469,11 @@
       "exportFailed": "Export failed",
       "clearTunSuccess": "TUN logs deleted successfully",
       "clearTunSuccessDesc": "TUN device log file has been deleted and recreated",
-      "clearTunFailed": "TUN logs deletion failed"
+      "clearTunFailed": "TUN logs deletion failed",
+      "tunLogUpdateSuccess": "TUN logging setting updated successfully",
+      "tunLogEnabledDesc": "TUN device logging has been enabled",
+      "tunLogDisabledDesc": "TUN device logging has been disabled",
+      "tunLogUpdateFailed": "Failed to update TUN logging setting"
     }
   },
   "tun": {

@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::path::PathBuf;
 use std::fs::OpenOptions;
 use std::io::Write;
+use chrono::Utc;
 
 // 导入日志宏
 use crate::{log_info, log_warn, log_error, log_debug};
@@ -246,9 +247,49 @@ pub fn set_tun_log_file_path(log_path: std::path::PathBuf) {
     *path_guard = Some(log_path);
 }
 
-/// 日志回调函数实现 - 禁用所有日志输出
-extern "C" fn log_callback_impl(_verbosity: Tun2proxyVerbosity, _message: *const c_char, _ctx: *mut c_void) {
-    // 不做任何处理，彻底禁用TUN日志输出
+/// 日志回调函数实现 - 将日志输出到tun.log文件
+extern "C" fn log_callback_impl(verbosity: Tun2proxyVerbosity, message: *const c_char, _ctx: *mut c_void) {
+    use crate::config::AppConfig;
+    
+    // 检查是否启用TUN日志
+    if let Ok(config) = AppConfig::load() {
+        if !config.tun_log_enabled {
+            return;
+        }
+    } else {
+        return;
+    }
+    
+    if message.is_null() {
+        return;
+    }
+    
+    unsafe {
+        if let Ok(c_str) = std::ffi::CStr::from_ptr(message).to_str() {
+            let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
+            let level = match verbosity {
+                Tun2proxyVerbosity::Off => "OFF",
+                Tun2proxyVerbosity::Error => "ERROR",
+                Tun2proxyVerbosity::Warn => "WARN",
+                Tun2proxyVerbosity::Info => "INFO",
+                Tun2proxyVerbosity::Debug => "DEBUG",
+                Tun2proxyVerbosity::Trace => "TRACE",
+            };
+            
+            let log_line = format!("[{}] [{}] [TUN2PROXY] {}\n", timestamp, level, c_str);
+            
+            // 尝试写入TUN日志文件
+            if let Ok(tun_log_path) = AppConfig::tun_log_path() {
+                if let Ok(mut file) = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&tun_log_path) {
+                    let _ = file.write_all(log_line.as_bytes());
+                    let _ = file.flush();
+                }
+            }
+        }
+    }
 }
 
 /// 流量统计回调函数实现

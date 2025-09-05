@@ -429,7 +429,9 @@
       "exportButton": "ログエクスポート",
       "clearTunTitle": "TUNデバイスログ削除",
       "clearTunDesc": "ネットワーク接続とルーティング情報を含むTUNデバイスのログファイルをクリアします。この操作は元に戻せません。",
-      "clearTunButton": "TUNログ削除"
+      "clearTunButton": "TUNログ削除",
+      "tunLogTitle": "TUNデバイスログ記録",
+      "tunLogDesc": "TUNデバイスのログ記録を有効または無効にします。有効にすると、詳細なネットワーク接続とルーティング情報が記録されます。"
     },
     "confirmClear": {
       "title": "ログクリア確認",
@@ -460,7 +462,11 @@
       "exportFailed": "エクスポート失敗",
       "clearTunSuccess": "TUNログ削除成功",
       "clearTunSuccessDesc": "TUNデバイスログファイルが削除され、再作成されました",
-      "clearTunFailed": "TUNログ削除失敗"
+      "clearTunFailed": "TUNログ削除失敗",
+      "tunLogUpdateSuccess": "TUNログ設定の更新が成功しました",
+      "tunLogEnabledDesc": "TUNデバイスログ記録が有効になりました",
+      "tunLogDisabledDesc": "TUNデバイスログ記録が無効になりました",
+      "tunLogUpdateFailed": "TUNログ設定の更新に失敗しました"
     }
   },
   "tun": {

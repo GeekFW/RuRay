@@ -76,6 +76,21 @@
           </template>
           
           <div class="space-y-4">
+            <!-- TUN设备日志开关 -->
+            <div class="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <div>
+                <h4 class="text-sm font-medium text-green-800 dark:text-green-200">{{ $t('logSettings.management.tunLogTitle') }}</h4>
+                <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                  {{ $t('logSettings.management.tunLogDesc') }}
+                </p>
+              </div>
+              <UToggle
+                v-model="tunLogEnabled"
+                @change="updateTunLogSetting"
+                :color="selectedThemeColor"
+                size="md"
+              />
+            </div>
             <!-- 清理日志 -->
             <div class="flex items-center justify-between p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
               <div>
@@ -261,6 +276,7 @@ const exporting = ref(false)
 const showClearConfirm = ref(false)
 const showClearTunConfirm = ref(false)
 const clearingTun = ref(false)
+const tunLogEnabled = ref(false)
 
 const logPath = ref('')
 const logSize = ref(0)
@@ -443,8 +459,47 @@ const clearTunLogFile = async () => {
   }
 }
 
+/**
+ * 获取TUN日志配置
+ */
+const getTunLogConfig = async () => {
+  try {
+    const config = await invoke('get_config') as { tun_log_enabled: boolean }
+    tunLogEnabled.value = config.tun_log_enabled
+  } catch (error) {
+    console.error('获取TUN日志配置失败:', error)
+  }
+}
+
+/**
+ * 更新TUN日志设置
+ */
+const updateTunLogSetting = async (enabled: boolean) => {
+  try {
+    await invoke('update_tun_log_setting', { enabled })
+    
+    toast.add({
+      title: $t('logSettings.messages.tunLogUpdateSuccess'),
+      description: enabled 
+        ? $t('logSettings.messages.tunLogEnabledDesc')
+        : $t('logSettings.messages.tunLogDisabledDesc'),
+      color: 'green'
+    })
+  } catch (error) {
+    console.error('更新TUN日志设置失败:', error)
+    // 恢复原来的状态
+    tunLogEnabled.value = !enabled
+    toast.add({
+      title: $t('logSettings.messages.tunLogUpdateFailed'),
+      description: error instanceof Error ? error.message : $t('common.unknownError'),
+      color: 'red'
+    })
+  }
+}
+
 // 生命周期钩子
 onMounted(async () => {
   await getLogInfo()
+  await getTunLogConfig()
 })
 </script>

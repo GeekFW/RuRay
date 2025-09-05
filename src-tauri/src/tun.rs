@@ -489,7 +489,6 @@ impl TunManager {
         
         // 构造命令行参数，支持多个绕过地址
         let mut cli_args = vec![
-            "tun2proxy".to_string(),
             "--setup".to_string(),
             "--proxy".to_string(),
             proxy_url.clone(),
@@ -507,6 +506,18 @@ impl TunManager {
         
         let cli_args_str = cli_args.join(" ");
         log_debug!("tun2proxy命令行参数: {}", cli_args_str);
+        
+        // 根据配置设置TUN日志回调
+        if let Ok(app_config) = crate::config::AppConfig::load() {
+            if app_config.tun_log_enabled {
+                log_debug!("TUN日志已启用，设置日志回调");
+                if let Err(e) = tun2proxy_ffi::set_log_callback() {
+                    log_warn!("设置TUN日志回调失败: {}", e);
+                }
+            } else {
+                log_debug!("TUN日志已禁用，跳过日志回调设置");
+            }
+        }
         
         // 使用DLL接口启动tun2proxy
         log_debug!("开始调用tun2proxy_ffi::run_with_cli_args函数（注意：这是一个阻塞调用）");

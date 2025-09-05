@@ -136,6 +136,9 @@ pub struct AppConfig {
     /// 是否启用日志流
     #[serde(default)]
     pub log_stream_enabled: bool,
+    /// 是否启用TUN日志输出
+    #[serde(default)]
+    pub tun_log_enabled: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -185,6 +188,7 @@ impl Default for AppConfig {
             tun_config: TunConfig::default(),
             tun_enabled: false,
             log_stream_enabled: false,
+            tun_log_enabled: false,
             created_at: chrono::Utc::now().to_rfc3339(),
             updated_at: chrono::Utc::now().to_rfc3339(),
         }
@@ -304,6 +308,25 @@ impl AppConfig {
     pub fn check_xray_exists() -> Result<bool> {
         let executable = Self::xray_executable()?;
         Ok(executable.exists())
+    }
+
+    /// 获取TUN日志文件路径
+    /// 
+    /// # Returns
+    /// 
+    /// * `Result<PathBuf>` - TUN日志文件路径
+    pub fn tun_log_path() -> Result<PathBuf> {
+        let config_dir = dirs::config_dir()
+            .context("无法获取配置目录")?
+            .join("RuRay")
+            .join("log");
+        
+        if !config_dir.exists() {
+            fs::create_dir_all(&config_dir)
+                .context("无法创建日志目录")?;
+        }
+        
+        Ok(config_dir.join("tun.log"))
     }
 }
 

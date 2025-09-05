@@ -1244,3 +1244,31 @@ pub async fn exit_app() -> Result<(), String> {
     // 退出程序
     std::process::exit(0);
 }
+
+/// 获取应用配置
+/// 获取当前应用的完整配置信息
+/// 
+/// # 返回值
+/// * `Result<AppConfig, String>` - 应用配置
+#[tauri::command]
+pub async fn get_config() -> Result<AppConfig, String> {
+    AppConfig::load().map_err(|e| e.to_string())
+}
+
+/// 更新TUN日志设置
+/// 更新TUN设备日志的开启/关闭状态
+/// 
+/// # 参数
+/// * `enabled` - 是否启用TUN日志
+/// 
+/// # 返回值
+/// * `Result<(), String>` - 更新结果
+#[tauri::command]
+pub async fn update_tun_log_setting(enabled: bool) -> Result<(), String> {
+    let mut config = AppConfig::load().map_err(|e| e.to_string())?;
+    config.tun_log_enabled = enabled;
+    config.save().map_err(|e| e.to_string())?;
+    
+    log_info!("TUN日志设置已更新: {}", if enabled { "启用" } else { "禁用" });
+    Ok(())
+}
