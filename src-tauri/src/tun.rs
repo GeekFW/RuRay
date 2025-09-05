@@ -14,7 +14,7 @@ use tauri::{AppHandle, Manager, path::BaseDirectory};
 
 
 // 导入日志宏
-use crate::{log_info, log_warn, log_error};
+use crate::{log_info, log_warn, log_error, log_debug};
 use crate::proxy::ProxyManager;
 use crate::tun2proxy_ffi::{self, Tun2proxyDns, Tun2proxyVerbosity};
 
@@ -232,36 +232,36 @@ impl TunManager {
         // 使用tun2proxy目录下的tun2proxy.dll
         let tun2proxy_resource_path = "tun2proxy/tun2proxy.dll";
         
-        log_info!("开始初始化tun2proxy DLL...");
+        log_debug!("开始初始化tun2proxy DLL...");
         
         // 使用Tauri的路径解析API获取资源文件路径
         match app_handle.path().resolve(tun2proxy_resource_path, BaseDirectory::Resource) {
             Ok(dll_path) => {
-                log_info!("解析到tun2proxy.dll路径: {}", dll_path.display());
+                log_debug!("解析到tun2proxy.dll路径: {}", dll_path.display());
                 if dll_path.exists() {
-                    log_info!("找到tun2proxy.dll文件: {}", dll_path.display());
+                    log_debug!("找到tun2proxy.dll文件: {}", dll_path.display());
                     
                     // 初始化tun2proxy DLL
                     match tun2proxy_ffi::init_tun2proxy_dll(dll_path.clone()) {
                         Ok(_) => {
-                            log_info!("tun2proxy DLL初始化成功");
+                            log_debug!("tun2proxy DLL初始化成功");
                             return Ok(());
                         }
                         Err(e) => {
-                            log_error!("使用资源路径初始化tun2proxy DLL失败: {}", e);
+                            log_debug!("使用资源路径初始化tun2proxy DLL失败: {}", e);
                         }
                     }
                 } else {
-                    log_warn!("警告: 嵌入的tun2proxy.dll文件不存在: {}", dll_path.display());
+                    log_debug!("警告: 嵌入的tun2proxy.dll文件不存在: {}", dll_path.display());
                 }
             }
             Err(e) => {
-                log_warn!("警告: 无法解析tun2proxy.dll资源路径: {}", e);
+                log_debug!("警告: 无法解析tun2proxy.dll资源路径: {}", e);
             }
         }
         
         // 如果资源路径解析失败，尝试使用旧的方法
-        log_info!("尝试使用程序目录下的tun2proxy.dll");
+        log_debug!("尝试使用程序目录下的tun2proxy.dll");
         match self.get_tun2proxy_path() {
             Ok(tun2proxy_bin_path) => {
                 let dll_path = tun2proxy_bin_path.parent()
@@ -273,21 +273,21 @@ impl TunManager {
                 if dll_path.exists() {
                     match tun2proxy_ffi::init_tun2proxy_dll(dll_path.clone()) {
                         Ok(_) => {
-                            log_info!("使用程序目录下的tun2proxy DLL初始化成功");
+                            log_debug!("使用程序目录下的tun2proxy DLL初始化成功");
                             return Ok(());
                         }
                         Err(e) => {
-                            log_error!("使用程序目录初始化tun2proxy DLL失败: {}", e);
+                            log_debug!("使用程序目录初始化tun2proxy DLL失败: {}", e);
                             return Err(e.context("初始化tun2proxy DLL失败"));
                         }
                     }
                 } else {
-                    log_error!("tun2proxy.dll文件不存在: {}", dll_path.display());
+                    log_debug!("tun2proxy.dll文件不存在: {}", dll_path.display());
                     return Err(anyhow::anyhow!("tun2proxy.dll文件不存在: {}", dll_path.display()));
                 }
             }
             Err(e) => {
-                log_error!("获取tun2proxy路径失败: {}", e);
+                log_debug!("获取tun2proxy路径失败: {}", e);
                 return Err(e.context("获取tun2proxy路径失败"));
             }
         }
@@ -295,7 +295,7 @@ impl TunManager {
 
     #[cfg(not(target_os = "windows"))]
     fn init_tun2proxy_dll(&self) -> Result<()> {
-        log_info!("非Windows系统，跳过tun2proxy DLL初始化");
+        log_debug!("非Windows系统，跳过tun2proxy DLL初始化");
         Ok(())
     }
 
@@ -457,22 +457,8 @@ impl TunManager {
         let server_address = self.get_current_server_address().await
             .context("获取当前服务器地址失败")?;
         
-        // 获取程序运行目录并创建日志文件路径
-        let app_dir = std::env::current_exe()
-            .context("获取程序路径失败")?
-            .parent()
-            .context("获取程序目录失败")?
-            .to_path_buf();
-        let log_file_path = app_dir.join("tun.log");
-        
-        log_info!("tun2proxy日志将输出到: {}", log_file_path.display());
-        
-        // 设置tun2proxy日志文件路径
-        tun2proxy_ffi::set_tun_log_file_path(log_file_path);
-        
-        // 设置日志回调
-        tun2proxy_ffi::set_log_callback()
-            .context("设置日志回调失败")?;
+        // 不设置日志文件路径和日志回调，避免TUN日志输出到文件
+        log_info!("TUN设备启动时不输出日志到文件");
         
         // 构建绕过地址列表
         let mut bypass_addresses = Vec::new();
@@ -498,7 +484,7 @@ impl TunManager {
             }
         }
         
-        log_info!("启动tun2proxy DLL，TUN设备: {}, 代理: {}, 绕过地址: {:?}", 
+        log_debug!("启动tun2proxy DLL，TUN设备: {}, 代理: {}, 绕过地址: {:?}", 
                  config.name, proxy_url, bypass_addresses);
         
         // 构造命令行参数，支持多个绕过地址
@@ -520,10 +506,10 @@ impl TunManager {
         }
         
         let cli_args_str = cli_args.join(" ");
-        log_info!("tun2proxy命令行参数: {}", cli_args_str);
+        log_debug!("tun2proxy命令行参数: {}", cli_args_str);
         
         // 使用DLL接口启动tun2proxy
-        log_info!("开始调用tun2proxy_ffi::run_with_cli_args函数（注意：这是一个阻塞调用）");
+        log_debug!("开始调用tun2proxy_ffi::run_with_cli_args函数（注意：这是一个阻塞调用）");
         
         // 由于tun2proxy_run_with_cli_args是阻塞调用，我们需要在单独的线程中运行它
         // 首先设置运行状态为true，表示正在启动
@@ -548,7 +534,7 @@ impl TunManager {
         let running_arc = Arc::clone(&self.running);
         
         std::thread::spawn(move || {
-            log_info!("后台线程开始执行tun2proxy_ffi::run_with_cli_args");
+            log_debug!("后台线程开始执行tun2proxy_ffi::run_with_cli_args");
             
             match tun2proxy_ffi::run_with_cli_args(
                 &cli_args_clone,
@@ -556,7 +542,7 @@ impl TunManager {
                 false, // packet_information
             ) {
                 Ok(exit_code) => {
-                    log_info!("tun2proxy_ffi::run_with_cli_args函数调用完成，返回退出码: {}", exit_code);
+                    log_debug!("tun2proxy_ffi::run_with_cli_args函数调用完成，返回退出码: {}", exit_code);
                     
                     // 更新状态
                     {
@@ -567,7 +553,7 @@ impl TunManager {
                             status.error = Some(error_msg.clone());
                             log_warn!("{}", error_msg);
                         } else {
-                            log_info!("tun2proxy正常退出，退出码: {}", exit_code);
+                            log_debug!("tun2proxy正常退出，退出码: {}", exit_code);
                         }
                     }
                     
@@ -590,13 +576,13 @@ impl TunManager {
                 }
             }
             
-            log_info!("tun2proxy后台任务执行完成");
+            log_debug!("tun2proxy后台任务执行完成");
         });
         
         // 给一点时间让tun2proxy启动
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         
-        log_info!("TUN模式启动请求已提交，tun2proxy正在后台运行，虚拟网卡: {}", config.name);
+        log_debug!("TUN模式启动请求已提交，tun2proxy正在后台运行，虚拟网卡: {}", config.name);
         Ok(())
     }
 
@@ -613,7 +599,7 @@ impl TunManager {
             return Ok(());
         }
         
-        log_info!("正在停止tun2proxy DLL");
+        log_debug!("正在停止tun2proxy DLL");
         
         // 重要说明：tun2proxy DLL是全局单例，无论在哪个线程启动，
         // stop()函数都会停止同一个tun2proxy实例
@@ -630,13 +616,13 @@ impl TunManager {
                 match stop_result {
                     Ok(exit_code) => {
                         if exit_code == 0 {
-                            log_info!("tun2proxy DLL已成功停止");
+                            log_debug!("tun2proxy DLL已成功停止");
                         } else {
-                            log_warn!("tun2proxy DLL停止时返回非零退出码: {}", exit_code);
+                            log_debug!("tun2proxy DLL停止时返回非零退出码: {}", exit_code);
                         }
                     }
                     Err(e) => {
-                        log_warn!("停止tun2proxy DLL失败: {}", e);
+                        log_debug!("停止tun2proxy DLL失败: {}", e);
                     }
                 }
             }

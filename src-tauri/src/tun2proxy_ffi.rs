@@ -14,7 +14,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 
 // 导入日志宏
-use crate::{log_info, log_warn, log_error};
+use crate::{log_info, log_warn, log_error, log_debug};
 
 /// DNS查询处理策略
 #[repr(C)]
@@ -113,7 +113,7 @@ impl Tun2proxyDll {
     /// 
     /// * `Result<Self>` - 加载结果
     pub fn load(dll_path: PathBuf) -> Result<Self> {
-        log_info!("正在加载tun2proxy DLL: {}", dll_path.display());
+        log_debug!("正在加载tun2proxy DLL: {}", dll_path.display());
         
         // 加载动态库
         let library = unsafe { Library::new(&dll_path) }
@@ -127,14 +127,14 @@ impl Tun2proxyDll {
                 .context("无法找到tun2proxy_set_log_callback函数")?
         };
         let set_log_callback_fn = *set_log_callback;
-        log_info!("成功获取tun2proxy_set_log_callback函数");
+        log_debug!("成功获取tun2proxy_set_log_callback函数");
         
         let with_name_run: Symbol<WithNameRunFn> = unsafe {
             library.get(b"tun2proxy_with_name_run")
                 .context("无法找到tun2proxy_with_name_run函数")?
         };
         let with_name_run_fn = *with_name_run;
-        log_info!("成功获取tun2proxy_with_name_run函数");
+        log_debug!("成功获取tun2proxy_with_name_run函数");
         
 
         
@@ -143,7 +143,7 @@ impl Tun2proxyDll {
                 .context("无法找到tun2proxy_run_with_cli_args函数")?
         };
         let run_with_cli_args_fn = *run_with_cli_args;
-        log_info!("成功获取tun2proxy_run_with_cli_args函数");
+        log_debug!("成功获取tun2proxy_run_with_cli_args函数");
         
         let stop: Symbol<StopFn> = unsafe {
             library.get(b"tun2proxy_stop")
@@ -156,9 +156,9 @@ impl Tun2proxyDll {
                 .context("无法找到tun2proxy_set_traffic_status_callback函数")?
         };
         let set_traffic_status_callback_fn = *set_traffic_status_callback;
-        log_info!("成功获取tun2proxy_set_traffic_status_callback函数");
+        log_debug!("成功获取tun2proxy_set_traffic_status_callback函数");
         
-        log_info!("tun2proxy DLL加载成功");
+        log_debug!("tun2proxy DLL加载成功");
         
         Ok(Self {
             _library: library,
@@ -194,14 +194,14 @@ pub fn init_tun2proxy_dll(dll_path: PathBuf) -> Result<()> {
     let mut dll_guard = dll_instance.lock().unwrap();
     
     if dll_guard.is_some() {
-        log_warn!("tun2proxy DLL已经初始化");
+        log_debug!("tun2proxy DLL已经初始化");
         return Ok(());
     }
     
     let dll = Tun2proxyDll::load(dll_path)?;
     *dll_guard = Some(dll);
     
-    log_info!("tun2proxy DLL初始化完成");
+    log_debug!("tun2proxy DLL初始化完成");
     Ok(())
 }
 
@@ -227,7 +227,7 @@ where
             result
         },
         None => {
-            log_error!("tun2proxy DLL未初始化");
+            log_debug!("tun2proxy DLL未初始化");
             Err(anyhow::anyhow!("tun2proxy DLL未初始化"))
         },
     }
@@ -246,58 +246,9 @@ pub fn set_tun_log_file_path(log_path: std::path::PathBuf) {
     *path_guard = Some(log_path);
 }
 
-/// 日志回调函数实现
-extern "C" fn log_callback_impl(verbosity: Tun2proxyVerbosity, message: *const c_char, _ctx: *mut c_void) {
-    if message.is_null() {
-        return;
-    }
-    
-    let message_str = unsafe {
-        match CStr::from_ptr(message).to_str() {
-            Ok(s) => s,
-            Err(_) => return,
-        }
-    };
-    
-    // 获取当前时间戳
-     let now = chrono::Local::now();
-     let timestamp = now.format("%Y-%m-%d %H:%M:%S%.3f");
-     
-     // 格式化日志级别
-     let level_str = match verbosity {
-         Tun2proxyVerbosity::Error => "ERROR",
-         Tun2proxyVerbosity::Warn => "WARN",
-         Tun2proxyVerbosity::Info => "INFO",
-         Tun2proxyVerbosity::Debug => "DEBUG",
-         Tun2proxyVerbosity::Trace => "TRACE",
-         Tun2proxyVerbosity::Off => return,
-     };
-     
-     let log_line = format!("[{}] [{}] [tun2proxy] {}\n", timestamp, level_str, message_str);
-    
-    // 尝试写入到日志文件
-    if let Ok(path_guard) = TUN_LOG_FILE_PATH.lock() {
-        if let Some(log_path) = path_guard.as_ref() {
-            if let Ok(mut file) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(log_path) {
-                let _ = file.write_all(log_line.as_bytes());
-                let _ = file.flush();
-                return;
-            }
-        }
-    }
-    
-    // 如果文件写入失败，回退到原来的日志系统
-    match verbosity {
-        Tun2proxyVerbosity::Error => log_error!("[tun2proxy] {}", message_str),
-        Tun2proxyVerbosity::Warn => log_warn!("[tun2proxy] {}", message_str),
-        Tun2proxyVerbosity::Info => log_info!("[tun2proxy] {}", message_str),
-        Tun2proxyVerbosity::Debug => log_info!("[tun2proxy] {}", message_str),
-        Tun2proxyVerbosity::Trace => log_info!("[tun2proxy] {}", message_str),
-        Tun2proxyVerbosity::Off => {},
-    }
+/// 日志回调函数实现 - 禁用所有日志输出
+extern "C" fn log_callback_impl(_verbosity: Tun2proxyVerbosity, _message: *const c_char, _ctx: *mut c_void) {
+    // 不做任何处理，彻底禁用TUN日志输出
 }
 
 /// 流量统计回调函数实现
@@ -307,7 +258,7 @@ extern "C" fn traffic_callback_impl(status: *const Tun2proxyTrafficStatus, _ctx:
     }
     
     let traffic_status = unsafe { *status };
-    log_info!("[tun2proxy] 流量统计 - 发送: {} 字节, 接收: {} 字节", 
+    log_debug!("[tun2proxy] 流量统计 - 发送: {} 字节, 接收: {} 字节", 
               traffic_status.tx, traffic_status.rx);
 }
 
@@ -365,7 +316,7 @@ pub fn run_with_name(
     root_privilege: bool,
     verbosity: Tun2proxyVerbosity,
 ) -> Result<i32> {
-    log_info!("开始启动tun2proxy: proxy={}, tun={}, bypass={}", proxy_url, tun_name, bypass);
+    log_debug!("开始启动tun2proxy: proxy={}, tun={}, bypass={}", proxy_url, tun_name, bypass);
     
     let proxy_url_c = CString::new(proxy_url)
         .context("无法转换proxy_url为C字符串")?;
@@ -377,7 +328,7 @@ pub fn run_with_name(
     // 使用panic捕获机制包装FFI调用
     let ffi_result = std::panic::catch_unwind(|| {
         with_tun2proxy_dll(|dll| {
-            log_info!("调用tun2proxy DLL函数...");
+            log_debug!("调用tun2proxy DLL函数...");
             let result = unsafe {
                 (dll.with_name_run)(
                     proxy_url_c.as_ptr(),
@@ -388,14 +339,14 @@ pub fn run_with_name(
                     verbosity,
                 )
             };
-            log_info!("tun2proxy DLL函数调用完成，返回值: {}", result);
+            log_debug!("tun2proxy DLL函数调用完成，返回值: {}", result);
             Ok(result)
         })
     });
     
     match ffi_result {
         Ok(result) => {
-            log_info!("tun2proxy FFI调用成功");
+            log_debug!("tun2proxy FFI调用成功");
             result
         }
         Err(panic_info) => {
@@ -468,7 +419,7 @@ pub fn stop() -> Result<i32> {
             Ok(result)
         },
         None => {
-            log_error!("tun2proxy DLL未初始化");
+            log_debug!("tun2proxy DLL未初始化");
             Err(anyhow::anyhow!("tun2proxy DLL未初始化"))
         },
     }
