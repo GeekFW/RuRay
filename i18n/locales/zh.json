@@ -132,7 +132,9 @@
         "purple": "紫色",
         "orange": "橙色",
         "pink": "粉色"
-      }
+      },
+      "transparentBackground": "开启透明背景",
+      "backgroundOpacity": "背景透明度"
     },
     "proxy": {
       "title": "代理设置",

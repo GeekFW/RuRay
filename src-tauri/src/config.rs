@@ -71,6 +71,11 @@ fn default_language() -> String {
     "en".to_string()
 }
 
+/// 为background_opacity字段提供默认值
+fn default_background_opacity() -> u8 {
+   80
+}
+
 fn default_auth_method() -> String {
     "noauth".to_string()
 }
@@ -139,6 +144,12 @@ pub struct AppConfig {
     /// 是否启用TUN日志输出
     #[serde(default)]
     pub tun_log_enabled: bool,
+    /// 是否启用透明背景
+    #[serde(default)]
+    pub transparent_background_enabled: bool,
+    /// 背景透明度 (0-100)
+    #[serde(default = "default_background_opacity")]
+    pub background_opacity: u8,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -189,6 +200,8 @@ impl Default for AppConfig {
             tun_enabled: false,
             log_stream_enabled: false,
             tun_log_enabled: false,
+            transparent_background_enabled: false,
+            background_opacity: 30,
             created_at: chrono::Utc::now().to_rfc3339(),
             updated_at: chrono::Utc::now().to_rfc3339(),
         }

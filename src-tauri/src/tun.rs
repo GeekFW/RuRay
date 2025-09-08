@@ -457,8 +457,8 @@ impl TunManager {
         let server_address = self.get_current_server_address().await
             .context("获取当前服务器地址失败")?;
         
-        // 不设置日志文件路径和日志回调，避免TUN日志输出到文件
-        log_info!("TUN设备启动时不输出日志到文件");
+        // 根据配置决定是否输出TUN日志到文件
+        log_info!("TUN设备启动中...");
         
         // 构建绕过地址列表
         let mut bypass_addresses = Vec::new();
@@ -489,6 +489,7 @@ impl TunManager {
         
         // 构造命令行参数，支持多个绕过地址
         let mut cli_args = vec![
+            "tun2proxy".to_string(),
             "--setup".to_string(),
             "--proxy".to_string(),
             proxy_url.clone(),
@@ -496,6 +497,8 @@ impl TunManager {
             config.name.clone(),
             "--dns".to_string(),
             "over-tcp".to_string(),
+            "--verbosity".to_string(),
+            "error".to_string(),
         ];
         
         // 添加绕过地址参数
@@ -520,7 +523,7 @@ impl TunManager {
         }
         
         // 使用DLL接口启动tun2proxy
-        log_debug!("开始调用tun2proxy_ffi::run_with_cli_args函数（注意：这是一个阻塞调用）");
+        log_debug!("开始调用tun2proxy_ffi::run_with_cli_args函数");
         
         // 由于tun2proxy_run_with_cli_args是阻塞调用，我们需要在单独的线程中运行它
         // 首先设置运行状态为true，表示正在启动

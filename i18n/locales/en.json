@@ -123,7 +123,9 @@
         "purple": "Purple",
         "orange": "Orange",
         "pink": "Pink"
-      }
+      },
+      "transparentBackground": "Enable Transparent Background",
+      "backgroundOpacity": "Background Opacity"
     },
     "proxy": {
       "title": "Proxy Settings",

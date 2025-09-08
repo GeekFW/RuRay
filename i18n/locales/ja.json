@@ -119,7 +119,9 @@
         "purple": "紫",
         "orange": "オレンジ",
         "pink": "ピンク"
-      }
+      },
+      "transparentBackground": "透明背景を有効化",
+      "backgroundOpacity": "背景透明度"
     },
     "proxy": {
       "title": "プロキシ設定",

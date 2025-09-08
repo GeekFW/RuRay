@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-slate-900" @contextmenu.prevent="onContextMenu">
+  <div class="min-h-screen bg-gray-50 dark:bg-slate-900" data-app-background @contextmenu.prevent="onContextMenu">
     <!-- 如果是独立页面路由（如 advanced-log），直接显示页面内容 -->
     <NuxtPage v-if="isStandalonePage" />
 

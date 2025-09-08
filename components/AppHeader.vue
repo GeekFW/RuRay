@@ -114,7 +114,7 @@
                 <Icon name="heroicons:cog-6-tooth" class="w-5 h-5 text-green-500" />
                 <span>{{ $t('settings.title') }}</span>
               </div>
-              <UButton variant="ghost" size="sm" icon="i-heroicons-x-mark" @click="showSettings = false"
+              <UButton variant="ghost" size="sm" icon="i-heroicons-x-mark" @click="closeSettings"
                 class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
             </div>
           </template>
@@ -170,6 +170,29 @@
                         'w-6 h-6 rounded-full border-2',
                         selectedThemeColor === color.name ? 'border-gray-400' : 'border-transparent'
                       ]" :style="{ backgroundColor: color.value }" @click="setThemeColor(color.name)" />
+                    </div>
+                  </div>
+
+                  <!-- 透明背景设置 -->
+                  <div class="border-t pt-4 mt-4">
+                    <div class="flex items-center justify-between mb-4">
+                      <span>{{ $t('settings.theme.transparentBackground') }}</span>
+                      <UToggle v-model="transparentBackgroundEnabled" @change="updateTransparentBackground" />
+                    </div>
+                    
+                    <div v-if="transparentBackgroundEnabled" class="space-y-3">
+                      <div class="flex items-center justify-between">
+                        <span class="text-sm">{{ $t('settings.theme.backgroundOpacity') }}</span>
+                        <span class="text-sm text-gray-500">{{ backgroundOpacity }}%</span>
+                      </div>
+                      <URange 
+                        v-model="backgroundOpacity" 
+                        :min="10" 
+                        :max="90" 
+                        :step="5"
+                        @change="updateBackgroundOpacity"
+                        class="w-full"
+                      />
                     </div>
                   </div>
                 </div>
@@ -571,7 +594,7 @@
           <template #footer>
             <div class="absolute bottom-4 left-0 right-0 px-6">
               <div class="flex justify-end space-x-2">
-                <UButton variant="ghost" @click="showSettings = false">
+                <UButton variant="ghost" @click="closeSettings">
                   {{ $t('common.cancel') }}
                 </UButton>
                 <UButton @click="saveSettings">
@@ -696,6 +719,10 @@ const setupStatus = ref('')
 
 // 日志流相关状态
 const logStreamEnabled = ref(false)
+
+// 透明背景相关状态
+const transparentBackgroundEnabled = ref(false)
+const backgroundOpacity = ref(80)
 
 // 应用版本信息
 const appVersion = ref('')
@@ -1057,6 +1084,8 @@ const saveSettings = async () => {
     config.socks_port = parseInt(socksPort.value.toString()) || 10087
     config.theme_color = selectedThemeColor.value || 'green'
     config.log_stream_enabled = logStreamEnabled.value
+    config.transparent_background_enabled = transparentBackgroundEnabled.value
+    config.background_opacity = backgroundOpacity.value
 
     // 更新 inbound 配置
     config.inbound_sniffing_enabled = inboundSniffingEnabled.value
@@ -1237,6 +1266,8 @@ const loadSettings = async () => {
     autoConnect.value = config.auto_connect || false
     selectedThemeColor.value = config.theme_color || 'green'
     logStreamEnabled.value = config.log_stream_enabled || false
+    transparentBackgroundEnabled.value = config.transparent_background_enabled || false
+    backgroundOpacity.value = config.background_opacity || 80
     
     // 加载语言配置
     try {
@@ -1317,6 +1348,61 @@ const openGitHub = async () => {
   await openUrl('https://github.com/GeekFW/RuRay')
 }
 
+// 透明背景相关方法
+const updateTransparentBackground = () => {
+  updateBackgroundStyles()
+}
+
+const updateBackgroundOpacity = () => {
+  updateBackgroundStyles()
+}
+
+const updateBackgroundStyles = () => {
+  // 更新应用背景样式
+  const appElement = document.querySelector('[data-app-background]')
+  const serverListElement = document.querySelector('[data-server-list-background]')
+  
+  if (transparentBackgroundEnabled.value) {
+    const opacity = backgroundOpacity.value
+    
+    if (appElement) {
+      // 移除现有的透明度类名
+      appElement.className = appElement.className.replace(/opacity-\d+/g, '')
+      // 添加新的透明度类名
+      appElement.className += ` opacity-${opacity}`
+    }
+    
+    if (serverListElement) {
+      // 移除现有的透明度类名
+      serverListElement.className = serverListElement.className.replace(/opacity-\d+/g, '')
+      // 添加新的透明度类名
+      serverListElement.className += ` opacity-${opacity}`
+    }
+  } else {
+    // 移除透明度类名
+    if (appElement) {
+      appElement.className = appElement.className.replace(/opacity-\d+/g, '')
+    }
+    
+    if (serverListElement) {
+      serverListElement.className = serverListElement.className.replace(/opacity-\d+/g, '')
+    }
+  }
+  
+  // 清理多余的空格
+  if (appElement) {
+    appElement.className = appElement.className.replace(/\s+/g, ' ').trim()
+  }
+  if (serverListElement) {
+    serverListElement.className = serverListElement.className.replace(/\s+/g, ' ').trim()
+  }
+}
+
+const closeSettings = async () => {
+  await saveSettings()
+  showSettings.value = false
+}
+
 const openUrl = async (url: string) => {
   try {
     const { open } = await import('@tauri-apps/plugin-shell')
@@ -1330,6 +1416,9 @@ const openUrl = async (url: string) => {
 
 // 组件挂载时加载设置
 onMounted(() => {
-  loadSettings()
+  loadSettings().then(() => {
+    // 加载设置后应用背景样式
+    updateBackgroundStyles()
+  })
 })
 </script>
