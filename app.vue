@@ -39,7 +39,7 @@
 
     <!-- 右键菜单 -->
     <UContextMenu v-model="isContextMenuOpen" :virtual-element="virtualElement">
-      <div class="p-1 w-48 bg-white/80 dark:bg-gray-800/80">
+      <div class="p-1 w-48 bg-white/80 dark:bg-slate-800/80">
         <div class="space-y-1">
           <button @click="toggleThemeMode"
             class="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">

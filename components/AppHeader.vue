@@ -1,6 +1,6 @@
 <template>
   <div
-    class="h-12 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 drag-region select-none">
+    class="h-12 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 drag-region select-none">
     <!-- 左侧 Logo 和标题 -->
     <div class="flex items-center space-x-3 no-drag">
       <div class="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center">
@@ -66,7 +66,7 @@
           </p>
 
           <!-- 当前版本信息 -->
-          <div v-if="currentXrayVersion" class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+          <div v-if="currentXrayVersion" class="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border">
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600 dark:text-gray-400">{{ $t('update.currentVersion') }}</span>
               <span class="text-sm font-medium text-gray-900 dark:text-white">{{ currentXrayVersion }}</span>
@@ -104,7 +104,7 @@
       container: 'flex min-h-full items-center justify-center p-4',
       wrapper: 'flex items-center justify-center min-h-full',
       inner: 'flex items-center justify-center min-h-full',
-      base: 'relative text-left rtl:text-right flex flex-col bg-white dark:bg-gray-900 shadow-xl w-full lg:max-w-4xl  md:max-w-2xl rounded-lg sm:my-8'
+      base: 'relative text-left rtl:text-right flex flex-col bg-white dark:bg-slate-900 shadow-xl w-full lg:max-w-4xl  md:max-w-2xl rounded-lg sm:my-8'
     }">
       <div class="flex items-center justify-center min-h-full w-full">
         <UCard class="h-[90vh] max-h-[90vh] overflow-hidden flex flex-col w-[800px]">
@@ -441,7 +441,7 @@
                   <!-- 项目信息 -->
                   <div class="space-y-4">
                     <!-- 项目地址 -->
-                    <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800 rounded-lg">
                       <div class="flex items-center space-x-3">
                         <Icon name="simple-icons:github" class="w-6 h-6 text-gray-700 dark:text-gray-300" />
                         <div>
@@ -460,7 +460,7 @@
                     </div>
 
                     <!-- 项目简介 -->
-                    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div class="p-4 bg-gray-50 dark:bg-slate-800 rounded-lg">
                       <h4 class="font-medium text-gray-900 dark:text-white mb-2">{{ $t('settings.about.description') }}</h4>
                       <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                         {{ $t('settings.about.descriptionText') }}
@@ -468,7 +468,7 @@
                     </div>
 
                     <!-- 开源库信息 -->
-                    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div class="p-4 bg-gray-50 dark:bg-slate-800 rounded-lg">
                       <h4 class="font-medium text-gray-900 dark:text-white mb-3">{{ $t('settings.about.openSourceLibraries') }}</h4>
                       <div class="space-y-3">
                         <!-- Tauri -->
@@ -576,7 +576,7 @@
                     </div>
 
                     <!-- 版本信息 -->
-                    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div class="p-4 bg-gray-50 dark:bg-slate-800 rounded-lg">
                       <h4 class="font-medium text-gray-900 dark:text-white mb-2">{{ $t('settings.about.version') }}</h4>
                       <div class="flex items-center justify-between">
                         <span class="text-sm text-gray-600 dark:text-gray-400">Ruray v{{ appVersion }}</span>

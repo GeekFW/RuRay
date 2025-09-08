@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed inset-0 bg-white dark:bg-gray-900 flex items-center justify-center z-50">
+  <div class="fixed inset-0 bg-white dark:bg-slate-900 flex items-center justify-center z-50">
     <div class="text-center">
       <!-- Logo 区域 -->
       <div class="mb-8">
@@ -30,7 +30,7 @@
       
       <!-- 进度条 -->
       <div class="w-64 mx-auto mt-6">
-        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+        <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
           <div 
             class="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300 ease-out"
             :style="{ width: `${progress}%` }"

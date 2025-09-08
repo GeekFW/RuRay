@@ -1,5 +1,5 @@
 <template>
-  <div class="h-8 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 text-xs select-none">
+  <div class="h-8 bg-gray-100 dark:bg-slate-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 text-xs select-none">
     <!-- 左侧状态信息 -->
     <div class="flex items-center space-x-6">
       <!-- 代理状态 -->
@@ -32,7 +32,7 @@
         <span class="text-gray-600 dark:text-gray-400 select-none" :class="{ 'text-green-600 dark:text-green-400': tunEnabled }">
           {{ tunModeText }}
         </span>
-        <div class="relative inline-flex h-4 w-7 items-center rounded-full transition-colors" :class="tunEnabled ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'">
+        <div class="relative inline-flex h-4 w-7 items-center rounded-full transition-colors" :class="tunEnabled ? 'bg-green-600' : 'bg-gray-300 dark:bg-slate-600'">
           <span class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform" :class="tunEnabled ? 'translate-x-3.5' : 'translate-x-0.5'"></span>
         </div>
       </div>

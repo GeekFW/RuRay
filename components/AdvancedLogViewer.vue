@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col bg-white dark:bg-gray-800">
+  <div class="h-screen flex flex-col bg-white dark:bg-slate-800">
     <!-- 头部 -->
     <div class="p-4 border-b border-gray-200 dark:border-gray-700 drag-region">
       <div class="flex items-center justify-between">
@@ -55,7 +55,7 @@
     <!-- 日志内容 -->
     <div 
       ref="logContainer"
-      class="flex-1 overflow-y-auto p-4 font-mono text-sm bg-gray-50 dark:bg-gray-900"
+      class="flex-1 overflow-y-auto p-4 font-mono text-sm bg-gray-50 dark:bg-slate-900"
     >
       <div v-if="logs.length === 0" class="text-center py-12">
         <Icon name="heroicons:document-text" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -88,7 +88,7 @@
     </div>
     
     <!-- 底部状态 -->
-    <div class="p-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+    <div class="p-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900">
       <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>{{ $t('advancedLogViewer.totalLogs', { count: logs.length }) }}</span>
         <span v-if="isPaused" class="text-orange-500">

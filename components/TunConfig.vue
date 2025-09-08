@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full flex flex-col bg-white dark:bg-gray-800">
+  <div class="h-full flex flex-col bg-white dark:bg-slate-800">
     <!-- 头部 -->
     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between mb-3">
@@ -16,7 +16,7 @@
       </div>
       
       <!-- TUN状态显示 -->
-      <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div class="mb-4 p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <UIcon 

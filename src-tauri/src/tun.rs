@@ -173,9 +173,13 @@ impl TunManager {
     /// * `Result<()>` - 初始化结果
     #[cfg(target_os = "windows")]
     fn init_wintun_path(&self) -> Result<()> {
-        let app_handle_guard = self.app_handle.lock().unwrap();
-        let app_handle = app_handle_guard.as_ref()
-            .context("应用句柄未设置，请先调用 set_app_handle")?;
+        // 获取应用句柄的克隆，避免长时间持有锁
+        let app_handle = {
+            let app_handle_guard = self.app_handle.lock().unwrap();
+            app_handle_guard.as_ref()
+                .context("应用句柄未设置，请先调用 set_app_handle")?
+                .clone()
+        };
         
         // 使用tun2proxy目录下的wintun.dll
         let wintun_resource_path = "tun2proxy/wintun.dll";
@@ -225,9 +229,13 @@ impl TunManager {
     /// * `Result<()>` - 初始化结果
     #[cfg(target_os = "windows")]
     fn init_tun2proxy_dll(&self) -> Result<()> {
-        let app_handle_guard = self.app_handle.lock().unwrap();
-        let app_handle = app_handle_guard.as_ref()
-            .context("应用句柄未设置，请先调用 set_app_handle")?;
+        // 获取应用句柄的克隆，避免长时间持有锁
+        let app_handle = {
+            let app_handle_guard = self.app_handle.lock().unwrap();
+            app_handle_guard.as_ref()
+                .context("应用句柄未设置，请先调用 set_app_handle")?
+                .clone()
+        };
         
         // 使用tun2proxy目录下的tun2proxy.dll
         let tun2proxy_resource_path = "tun2proxy/tun2proxy.dll";

@@ -194,9 +194,11 @@ pub fn init_tun2proxy_dll(dll_path: PathBuf) -> Result<()> {
     let dll_instance = get_tun2proxy_dll();
     let mut dll_guard = dll_instance.lock().unwrap();
     
+    // 如果DLL已经初始化，先清理旧的实例，然后重新初始化
+    // 这样可以避免因为之前的DLL状态异常导致的问题
     if dll_guard.is_some() {
-        log_debug!("tun2proxy DLL已经初始化");
-        return Ok(());
+        log_debug!("检测到已存在的tun2proxy DLL实例，正在重新初始化");
+        *dll_guard = None; // 清理旧实例
     }
     
     let dll = Tun2proxyDll::load(dll_path)?;
@@ -231,6 +233,50 @@ where
             log_debug!("tun2proxy DLL未初始化");
             Err(anyhow::anyhow!("tun2proxy DLL未初始化"))
         },
+    }
+}
+
+/// 绕过锁机制直接调用stop函数，用于解决锁竞争问题
+/// 
+/// # Returns
+/// 
+/// * `Result<i32>` - 停止结果，返回退出码
+fn stop_without_lock() -> Result<i32> {
+    let dll_instance = get_tun2proxy_dll();
+    
+    // 尝试获取锁，如果无法获取则直接返回错误
+    match dll_instance.try_lock() {
+        Ok(dll_guard) => {
+            match dll_guard.as_ref() {
+                Some(dll) => {
+                    let exit_code = unsafe { (dll.tun2proxy_stop)() };
+                    log_debug!("tun2proxy停止（无锁模式），退出码: {}", exit_code);
+                    Ok(exit_code)
+                },
+                None => {
+                    log_debug!("tun2proxy DLL未初始化");
+                    Err(anyhow::anyhow!("tun2proxy DLL未初始化"))
+                },
+            }
+        },
+        Err(_) => {
+            // 锁被占用，说明可能有运行中的TUN设备，使用阻塞方式获取锁
+            log_debug!("检测到锁被占用，使用阻塞方式获取锁进行停止操作");
+            
+            // 直接使用阻塞锁获取，虽然可能等待，但这是安全的方式
+            let dll_guard = dll_instance.lock().unwrap();
+            match dll_guard.as_ref() {
+                Some(dll) => {
+                    let exit_code = unsafe { (dll.tun2proxy_stop)() };
+                    log_debug!("tun2proxy阻塞停止，退出码: {}", exit_code);
+                    Ok(exit_code)
+                },
+                None => {
+                    log_debug!("tun2proxy DLL未初始化");
+                    Err(anyhow::anyhow!("tun2proxy DLL未初始化"))
+                },
+            }
+        }
     }
 }
 
@@ -366,29 +412,49 @@ pub fn run_with_name(
     let bypass_c = CString::new(bypass)
         .context("无法转换bypass为C字符串")?;
     
+    // 获取DLL函数指针，然后立即释放锁
+    let dll_function = {
+        let dll_instance = get_tun2proxy_dll();
+        let dll_guard = dll_instance.lock().unwrap();
+        
+        match dll_guard.as_ref() {
+            Some(dll) => {
+                // 复制函数指针，这样就可以在释放锁后调用
+                let func_ptr = dll.with_name_run;
+                log_debug!("获取到tun2proxy DLL函数指针，准备释放锁");
+                Ok(func_ptr)
+            },
+            None => {
+                log_debug!("tun2proxy DLL未初始化");
+                Err(anyhow::anyhow!("tun2proxy DLL未初始化"))
+            },
+        }
+        // 这里dll_guard会被自动释放，锁也会被释放
+    }?;
+    
+    log_debug!("锁已释放，开始调用tun2proxy DLL函数");
+    
     // 使用panic捕获机制包装FFI调用
     let ffi_result = std::panic::catch_unwind(|| {
-        with_tun2proxy_dll(|dll| {
-            log_debug!("调用tun2proxy DLL函数...");
-            let result = unsafe {
-                (dll.with_name_run)(
-                    proxy_url_c.as_ptr(),
-                    tun_name_c.as_ptr(),
-                    bypass_c.as_ptr(),
-                    dns_strategy,
-                    root_privilege,
-                    verbosity,
-                )
-            };
-            log_debug!("tun2proxy DLL函数调用完成，返回值: {}", result);
-            Ok(result)
-        })
+        log_debug!("调用tun2proxy DLL函数...");
+        let result = unsafe {
+            dll_function(
+                proxy_url_c.as_ptr(),
+                tun_name_c.as_ptr(),
+                bypass_c.as_ptr(),
+                dns_strategy,
+                root_privilege,
+                verbosity,
+            )
+        };
+        log_debug!("tun2proxy DLL函数调用完成，返回值: {}", result);
+        result
     });
     
     match ffi_result {
         Ok(result) => {
             log_debug!("tun2proxy FFI调用成功");
-            result
+            Ok(result)
         }
         Err(panic_info) => {
             let error_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
@@ -420,48 +486,97 @@ pub fn run_with_cli_args(
     tun_mtu: u16,
     packet_information: bool,
 ) -> Result<i32> {
+    log_debug!("开始使用命令行参数启动tun2proxy: {}", cli_args);
+    
     let cli_args_c = CString::new(cli_args)
         .context("无法转换cli_args为C字符串")?;
     
-    with_tun2proxy_dll(|dll| {
-        let result = unsafe {
-            (dll.run_with_cli_args)(
-                cli_args_c.as_ptr(),
-                tun_mtu,
-                packet_information,
-            )
-        };
-        Ok(result)
-    })
+    // 获取DLL函数指针，然后立即释放锁
+    let dll_function = {
+        let dll_instance = get_tun2proxy_dll();
+        let dll_guard = dll_instance.lock().unwrap();
+        
+        match dll_guard.as_ref() {
+            Some(dll) => {
+                // 复制函数指针，这样就可以在释放锁后调用
+                let func_ptr = dll.run_with_cli_args;
+                log_debug!("获取到tun2proxy CLI DLL函数指针，准备释放锁");
+                Ok(func_ptr)
+            },
+            None => {
+                log_debug!("tun2proxy DLL未初始化");
+                Err(anyhow::anyhow!("tun2proxy DLL未初始化"))
+            },
+        }
+        // 这里dll_guard会被自动释放，锁也会被释放
+    }?;
+    
+    log_debug!("锁已释放，开始调用tun2proxy CLI DLL函数");
+    
+    let result = unsafe {
+        dll_function(
+            cli_args_c.as_ptr(),
+            tun_mtu,
+            packet_information,
+        )
+    };
+    
+    log_debug!("tun2proxy CLI DLL函数调用完成，返回值: {}", result);
+    Ok(result)
 }
 
 /// 停止tun2proxy
 /// 
-/// 注意：tun2proxy_stop是一个全局函数，不需要获取DLL锁
-/// 它会停止所有正在运行的tun2proxy实例
-/// 
 /// # Returns
 /// 
-/// * `Result<i32>` - 停止结果
-/// 停止tun2proxy服务
-/// 直接调用tun2proxy_stop函数，不获取任何锁
+/// * `Result<i32>` - 停止结果，返回退出码
 pub fn stop() -> Result<i32> {
-    // 获取DLL实例但不加锁
+    log_debug!("开始停止tun2proxy");
+    
+    // 使用绕过锁机制的停止函数，避免锁竞争问题
+    let result = stop_without_lock();
+    
+    // 停止后清理DLL实例，避免状态残留
+    cleanup_dll_instance();
+    
+    match &result {
+        Ok(exit_code) => log_debug!("tun2proxy停止成功，退出码: {}", exit_code),
+        Err(e) => log_error!("tun2proxy停止失败: {}", e),
+    }
+    
+    result
+}
+
+/// 清理DLL实例
+/// 
+/// 用于在停止tun2proxy后清理DLL状态，避免下次启动时出现状态冲突
+/// 采用延迟清理策略，确保TUN设备完全停止后再清理DLL
+pub fn cleanup_dll_instance() {
     let dll_instance = get_tun2proxy_dll();
     
-    // 使用unsafe直接访问Mutex内部数据，绕过锁机制
-    // 因为tun2proxy_stop是线程安全的全局函数，不需要锁保护
-    let mutex_ptr = Arc::as_ptr(dll_instance) as *mut std::sync::Mutex<Option<Tun2proxyDll>>;
-    let data_ptr = unsafe { (*mutex_ptr).get_mut().unwrap() };
-    
-    match data_ptr {
-        Some(dll) => {
-            let result = unsafe { (dll.tun2proxy_stop)() };
-            Ok(result)
+    // 尝试获取锁，如果无法获取说明可能还有其他操作在进行
+    match dll_instance.try_lock() {
+        Ok(mut dll_guard) => {
+            if dll_guard.is_some() {
+                log_debug!("开始延迟清理tun2proxy DLL实例");
+                
+                // 使用异步任务延迟清理，给TUN设备足够时间完全停止
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
+                    
+                    let dll_instance = get_tun2proxy_dll();
+                    if let Ok(mut dll_guard) = dll_instance.lock() {
+                        if dll_guard.is_some() {
+                            log_debug!("执行延迟清理：卸载tun2proxy DLL实例");
+                            *dll_guard = None;
+                            log_debug!("tun2proxy DLL实例已安全卸载");
+                        }
+                    }
+                });
+            }
         },
-        None => {
-            log_debug!("tun2proxy DLL未初始化");
-            Err(anyhow::anyhow!("tun2proxy DLL未初始化"))
-        },
+        Err(_) => {
+            log_debug!("无法获取DLL实例锁，跳过清理操作");
+        }
     }
 }

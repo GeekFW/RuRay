@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full flex flex-col bg-white dark:bg-gray-800">
+  <div class="h-full flex flex-col bg-white dark:bg-slate-800">
     <!-- 头部 -->
     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between">
@@ -65,7 +65,7 @@
     <!-- 日志内容 -->
     <div 
       ref="logContainer"
-      class="flex-1 overflow-y-auto p-4 font-mono text-sm bg-gray-50 dark:bg-gray-900"
+      class="flex-1 overflow-y-auto p-4 font-mono text-sm bg-gray-50 dark:bg-slate-900"
     >
       <div v-if="filteredLogs.length === 0" class="text-center py-12">
         <Icon name="heroicons:document-text" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -114,7 +114,7 @@
     </div>
     
     <!-- 底部状态 -->
-    <div class="p-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+    <div class="p-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900">
       <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>{{ $t('logViewer.totalLogs', { count: logs.length }) }}</span>
         <span v-if="filteredLogs.length !== logs.length">
@@ -174,7 +174,7 @@ const filteredLogs = computed(() => {
 // 方法
 const getLogLevelClass = (level: string) => {
   const classes = {
-    debug: 'border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800',
+    debug: 'border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-slate-800',
     info: 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20',
     warn: 'border-yellow-300 bg-yellow-50 dark:border-yellow-600 dark:bg-yellow-900/20',
     error: 'border-red-300 bg-red-50 dark:border-red-600 dark:bg-red-900/20'

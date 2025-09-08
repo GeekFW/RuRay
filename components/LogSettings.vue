@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full flex flex-col bg-white dark:bg-gray-800">
+  <div class="h-full flex flex-col bg-white dark:bg-slate-800">
     <!-- 头部 -->
     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between mb-3">
@@ -173,7 +173,7 @@
             </div>
           </div>
           
-          <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+          <div class="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg">
             <div class="text-sm text-gray-600 dark:text-gray-400">
               <p><strong>{{ $t('logSettings.confirmClear.filePath') }}：</strong>{{ logPath }}</p>
               <p><strong>{{ $t('logSettings.confirmClear.currentSize') }}：</strong>{{ logSizeDisplay }}</p>
@@ -221,7 +221,7 @@
             </div>
           </div>
           
-          <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+          <div class="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg">
             <div class="text-sm text-gray-600 dark:text-gray-400">
               <p><strong>{{ $t('logSettings.confirmClearTun.description') }}</strong></p>
               <p class="mt-2">{{ $t('logSettings.confirmClearTun.fileLocation') }}</p>
