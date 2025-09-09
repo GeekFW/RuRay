@@ -140,7 +140,7 @@ pub async fn delete_server(server_id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn start_tun_mode(config: TunConfig) -> Result<(), String> {
     let tun_manager = TunManager::instance();
-    tun_manager.start(config).await.map_err(|e| e.to_string())
+    tun_manager.start(config).map_err(|e| e.to_string())
 }
 
 /// 停止TUN模式
@@ -150,7 +150,7 @@ pub async fn start_tun_mode(config: TunConfig) -> Result<(), String> {
 #[tauri::command]
 pub async fn stop_tun_mode() -> Result<(), String> {
     let tun_manager = TunManager::instance();
-    tun_manager.stop().await.map_err(|e| e.to_string())
+    tun_manager.stop().map_err(|e| e.to_string())
 }
 
 /// 获取TUN模式状态
@@ -160,7 +160,7 @@ pub async fn stop_tun_mode() -> Result<(), String> {
 #[tauri::command]
 pub async fn get_tun_status() -> Result<TunStatus, String> {
     let tun_manager = TunManager::instance();
-    Ok(tun_manager.get_status().await)
+    Ok(tun_manager.get_status())
 }
 
 /// 检查TUN模式是否运行中
@@ -170,7 +170,7 @@ pub async fn get_tun_status() -> Result<TunStatus, String> {
 #[tauri::command]
 pub async fn is_tun_running() -> Result<bool, String> {
     let tun_manager = TunManager::instance();
-    Ok(tun_manager.is_running().await)
+    Ok(tun_manager.is_running())
 }
 
 /// 获取TUN配置
@@ -194,7 +194,7 @@ pub async fn get_tun_config() -> Result<TunConfig, String> {
 #[tauri::command]
 pub async fn update_tun_config(config: TunConfig) -> Result<(), String> {
     let tun_manager = TunManager::instance();
-    tun_manager.update_config(config).await.map_err(|e| e.to_string())
+    tun_manager.update_config(config).map_err(|e| e.to_string())
 }
 
 /// 保存TUN配置到文件
@@ -208,7 +208,7 @@ pub async fn update_tun_config(config: TunConfig) -> Result<(), String> {
 pub async fn save_tun_config(config: TunConfig) -> Result<(), String> {
     // 更新TUN管理器中的配置
     let tun_manager = TunManager::instance();
-    tun_manager.update_config(config.clone()).await.map_err(|e| e.to_string())?;
+    tun_manager.update_config(config.clone()).map_err(|e| e.to_string())?;
     
     // 保存到应用配置文件
     let mut app_config = AppConfig::load().map_err(|e| e.to_string())?;
@@ -250,7 +250,7 @@ pub async fn toggle_tun_mode(enabled: bool) -> Result<(), String> {
     if enabled {
         // 启用TUN模式
         let tun_config = config.tun_config.clone();
-        if let Err(e) = tun_manager.start(tun_config).await {
+        if let Err(e) = tun_manager.start(tun_config) {
             // TUN启动失败时，重置配置并保存
             let mut reset_config = AppConfig::load().map_err(|e| e.to_string())?;
             reset_config.tun_enabled = false;
@@ -261,7 +261,7 @@ pub async fn toggle_tun_mode(enabled: bool) -> Result<(), String> {
     } else {
         // 禁用TUN模式
         // 注意：使用tun2proxy时，系统路由由tun2proxy自动管理
-        tun_manager.stop().await.map_err(|e| e.to_string())?;
+        tun_manager.stop().map_err(|e| e.to_string())?;
     }
     
     Ok(())

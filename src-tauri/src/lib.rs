@@ -385,11 +385,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // 从配置文件加载TUN配置到TunManager
             if let Ok(app_config) = config::AppConfig::load() {
                 let tun_manager = tun::TunManager::instance();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(e) = tun_manager.update_config(app_config.tun_config).await {
-                        log_error!("加载TUN配置失败: {}", e);
-                    }
-                });
+                if let Err(e) = tun_manager.update_config(app_config.tun_config) {
+                    log_error!("加载TUN配置失败: {}", e);
+                }
             }
             
             // 设置SystemManager的应用句柄

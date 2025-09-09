@@ -75,7 +75,7 @@ impl ProxyManager {
         if config.tun_enabled {
             // 启动TUN模式
             let tun_manager = TunManager::instance();
-            if let Err(e) = tun_manager.start(config.tun_config.clone()).await {
+            if let Err(e) = tun_manager.start(config.tun_config.clone()) {
                 log_error!("启动TUN模式失败: {}", e);
                  // TUN模式启动失败时，禁用TUN模式并保存配置
                  config.tun_enabled = false;
@@ -249,9 +249,9 @@ impl ProxyManager {
     pub async fn stop(&self) -> Result<()> {
         // 停止TUN模式（如果正在运行）
         let tun_manager = TunManager::instance();
-        if tun_manager.is_running().await {
+        if tun_manager.is_running() {
             log_info!("正在停止TUN模式...");
-            match tun_manager.stop().await {
+            match tun_manager.stop() {
                 Ok(_) => {
                     log_info!("TUN模式已成功停止");
                     // 等待TUN完全停止，避免与代理停止产生竞态条件

@@ -126,10 +126,10 @@ pub struct TunStatus {
 
 /// TUN设备管理器
 pub struct TunManager {
-    config: Arc<Mutex<TunConfig>>,
-    status: Arc<Mutex<TunStatus>>,
-    running: Arc<AtomicBool>,
-    app_handle: Arc<Mutex<Option<AppHandle>>>,
+    config: Mutex<TunConfig>,
+    status: Mutex<TunStatus>,
+    running: AtomicBool,
+    app_handle: Mutex<Option<AppHandle>>,
 }
 
 // 全局单例实例
@@ -140,8 +140,8 @@ impl TunManager {
     pub fn instance() -> &'static TunManager {
         TUN_MANAGER.get_or_init(|| {
             Self {
-                config: Arc::new(Mutex::new(TunConfig::default())),
-                status: Arc::new(Mutex::new(TunStatus {
+                config: Mutex::new(TunConfig::default()),
+                status: Mutex::new(TunStatus {
                     is_running: false,
                     device_name: String::new(),
                     ip_address: String::new(),
@@ -149,9 +149,9 @@ impl TunManager {
                     bytes_sent: 0,
                     error: None,
                     process_id: None,
-                })),
-                running: Arc::new(AtomicBool::new(false)),
-                app_handle: Arc::new(Mutex::new(None)),
+                }),
+                running: AtomicBool::new(false),
+                app_handle: Mutex::new(None),
             }
         })
     }
@@ -162,8 +162,8 @@ impl TunManager {
     /// 
     /// * `handle` - Tauri应用句柄
     pub fn set_app_handle(&self, handle: AppHandle) {
-        let mut app_handle_guard = self.app_handle.lock().unwrap();
-        *app_handle_guard = Some(handle);
+        let mut app_handle = self.app_handle.lock().unwrap();
+        *app_handle = Some(handle);
     }
 
     /// 初始化WinTun库路径（仅Windows平台）
@@ -173,13 +173,10 @@ impl TunManager {
     /// * `Result<()>` - 初始化结果
     #[cfg(target_os = "windows")]
     fn init_wintun_path(&self) -> Result<()> {
-        // 获取应用句柄的克隆，避免长时间持有锁
-        let app_handle = {
-            let app_handle_guard = self.app_handle.lock().unwrap();
-            app_handle_guard.as_ref()
-                .context("应用句柄未设置，请先调用 set_app_handle")?
-                .clone()
-        };
+        let binding = self.app_handle.lock().unwrap();
+        let app_handle = binding
+            .as_ref()
+            .context("应用句柄未设置，请先调用 set_app_handle")?;
         
         // 使用tun2proxy目录下的wintun.dll
         let wintun_resource_path = "tun2proxy/wintun.dll";
@@ -229,13 +226,10 @@ impl TunManager {
     /// * `Result<()>` - 初始化结果
     #[cfg(target_os = "windows")]
     fn init_tun2proxy_dll(&self) -> Result<()> {
-        // 获取应用句柄的克隆，避免长时间持有锁
-        let app_handle = {
-            let app_handle_guard = self.app_handle.lock().unwrap();
-            app_handle_guard.as_ref()
-                .context("应用句柄未设置，请先调用 set_app_handle")?
-                .clone()
-        };
+        let binding = self.app_handle.lock().unwrap();
+        let app_handle = binding
+            .as_ref()
+            .context("应用句柄未设置，请先调用 set_app_handle")?;
         
         // 使用tun2proxy目录下的tun2proxy.dll
         let tun2proxy_resource_path = "tun2proxy/tun2proxy.dll";
@@ -351,9 +345,10 @@ impl TunManager {
     /// 
     /// * `Result<std::path::PathBuf>` - tun2proxy可执行文件路径
     fn get_tun2proxy_path(&self) -> Result<std::path::PathBuf> {
-        let app_handle_guard = self.app_handle.lock().unwrap();
-        let app_handle = app_handle_guard.as_ref()
-            .context("应用句柄未设置，请先调用 set_app_handle")?;
+        let app_handle = self.app_handle.lock().unwrap()
+            .as_ref()
+            .context("应用句柄未设置，请先调用 set_app_handle")?
+            .clone();
         
         let tun2proxy_resource_path = "tun2proxy/tun2proxy-bin.exe";
         
@@ -405,7 +400,7 @@ impl TunManager {
     /// # Returns
     /// 
     /// * `Result<String>` - 返回服务器地址，如果获取失败则返回错误
-    async fn get_current_server_address(&self) -> Result<String> {
+    fn get_current_server_address(&self) -> Result<String> {
         let proxy_manager = ProxyManager::instance();
         
         // 通过ProxyManager的公共方法获取当前服务器地址
@@ -423,7 +418,7 @@ impl TunManager {
     /// 
     /// # 返回值
     /// * `Result<()>` - 启动结果
-    pub async fn start(&self, config: TunConfig) -> Result<()> {
+    pub fn start(&self, config: TunConfig) -> Result<()> {
         // 检查管理员权限
         if !Self::is_admin() {
             return Err(anyhow::anyhow!("TUN_ERROR_ADMIN"));
@@ -450,22 +445,10 @@ impl TunManager {
         // 初始化tun2proxy DLL
         self.init_tun2proxy_dll()?;
 
-        // 如果已经在运行，先停止
-        if self.is_running().await {
-            self.stop().await?;
-        }
-
-        // 更新配置
-        {
-            let mut current_config = self.config.lock().unwrap();
-            *current_config = config.clone();
-        }
-
         // 获取当前激活服务器的地址信息
-        let server_address = self.get_current_server_address().await
+        let server_address = self.get_current_server_address()
             .context("获取当前服务器地址失败")?;
         
-        // 根据配置决定是否输出TUN日志到文件
         log_info!("TUN设备启动中...");
         
         // 构建绕过地址列表
@@ -530,11 +513,11 @@ impl TunManager {
             }
         }
         
-        // 使用DLL接口启动tun2proxy
-        log_debug!("开始调用tun2proxy_ffi::run_with_cli_args函数");
-        
-        // 由于tun2proxy_run_with_cli_args是阻塞调用，我们需要在单独的线程中运行它
-        // 首先设置运行状态为true，表示正在启动
+        // 更新状态
+        {
+            let mut current_config = self.config.lock().unwrap();
+            *current_config = config.clone();
+        }
         {
             let mut status = self.status.lock().unwrap();
             status.is_running = true;
@@ -543,68 +526,57 @@ impl TunManager {
             status.bytes_received = 0;
             status.bytes_sent = 0;
             status.error = None;
-            status.process_id = None; // DLL模式下没有独立进程ID
+            status.process_id = None;
         }
         
         // 更新运行状态
         self.running.store(true, Ordering::SeqCst);
         
-        // 在后台线程中启动tun2proxy（阻塞调用）
-        let cli_args_clone = cli_args_str.clone();
-        let mtu = config.mtu;
-        let status_arc = Arc::clone(&self.status);
-        let running_arc = Arc::clone(&self.running);
-        
-        std::thread::spawn(move || {
-            log_debug!("后台线程开始执行tun2proxy_ffi::run_with_cli_args");
-            
-            match tun2proxy_ffi::run_with_cli_args(
-                &cli_args_clone,
-                mtu,
+        // 使用panic捕获机制调用DLL函数
+        let start_result = std::panic::catch_unwind(|| {
+            tun2proxy_ffi::run_with_cli_args(
+                &cli_args_str,
+                config.mtu,
                 false, // packet_information
-            ) {
-                Ok(exit_code) => {
-                    log_debug!("tun2proxy_ffi::run_with_cli_args函数调用完成，返回退出码: {}", exit_code);
-                    
-                    // 更新状态
-                    {
-                        let mut status = status_arc.lock().unwrap();
-                        status.is_running = false;
-                        if exit_code != 0 {
-                            let error_msg = format!("tun2proxy退出，退出码: {}", exit_code);
-                            status.error = Some(error_msg.clone());
-                            log_warn!("{}", error_msg);
-                        } else {
-                            log_debug!("tun2proxy正常退出，退出码: {}", exit_code);
-                        }
-                    }
-                    
-                    // 更新运行状态
-                    running_arc.store(false, Ordering::SeqCst);
-                }
-                Err(e) => {
-                    let error_msg = format!("启动tun2proxy失败: {}", e);
-                    log_error!("{}", error_msg);
-                    
-                    // 更新状态以记录错误
-                    {
-                        let mut status = status_arc.lock().unwrap();
-                        status.is_running = false;
-                        status.error = Some(error_msg.clone());
-                    }
-                    
-                    // 确保运行状态也设置为false
-                    running_arc.store(false, Ordering::SeqCst);
-                }
-            }
-            
-            log_debug!("tun2proxy后台任务执行完成");
+            )
         });
         
-        // 给一点时间让tun2proxy启动
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        match start_result {
+            Ok(Ok(exit_code)) => {
+                log_debug!("tun2proxy启动成功，退出码: {}", exit_code);
+                if exit_code != 0 {
+                    {
+                        let mut status = self.status.lock().unwrap();
+                        status.error = Some(format!("tun2proxy退出，退出码: {}", exit_code));
+                        status.is_running = false;
+                    }
+                    self.running.store(false, Ordering::SeqCst);
+                    return Err(anyhow::anyhow!("tun2proxy启动失败，退出码: {}", exit_code));
+                }
+            }
+            Ok(Err(e)) => {
+                log_error!("tun2proxy启动失败: {}", e);
+                {
+                    let mut status = self.status.lock().unwrap();
+                    status.error = Some(format!("启动失败: {}", e));
+                    status.is_running = false;
+                }
+                self.running.store(false, Ordering::SeqCst);
+                return Err(e);
+            }
+            Err(panic_info) => {
+                log_error!("tun2proxy启动时发生panic: {:?}", panic_info);
+                {
+                    let mut status = self.status.lock().unwrap();
+                    status.error = Some("启动时发生panic".to_string());
+                    status.is_running = false;
+                }
+                self.running.store(false, Ordering::SeqCst);
+                return Err(anyhow::anyhow!("tun2proxy启动时发生panic"));
+            }
+        }
         
-        log_debug!("TUN模式启动请求已提交，tun2proxy正在后台运行，虚拟网卡: {}", config.name);
+        log_info!("TUN设备启动成功");
         Ok(())
     }
 
@@ -612,7 +584,7 @@ impl TunManager {
     /// 
     /// # 返回值
     /// * `Result<()>` - 停止结果
-    pub async fn stop(&self) -> Result<()> {
+    pub fn stop(&self) -> Result<()> {
         log_info!("开始停止TUN设备");
         
         // 检查是否正在运行
@@ -623,33 +595,24 @@ impl TunManager {
         
         log_debug!("正在停止tun2proxy DLL");
         
-        // 重要说明：tun2proxy DLL是全局单例，无论在哪个线程启动，
-        // stop()函数都会停止同一个tun2proxy实例
-        
-        // 在后台线程中调用DLL的stop函数，避免阻塞主线程
-        let stop_handle = std::thread::spawn(|| {
-            let result = tun2proxy_ffi::stop();
-            result
+        // 使用panic捕获机制调用DLL的stop函数
+        let stop_result = std::panic::catch_unwind(|| {
+            tun2proxy_ffi::stop()
         });
         
-        // 等待stop操作完成，设置10秒超时
-        match stop_handle.join() {
-            Ok(stop_result) => {
-                match stop_result {
-                    Ok(exit_code) => {
-                        if exit_code == 0 {
-                            log_debug!("tun2proxy DLL已成功停止");
-                        } else {
-                            log_debug!("tun2proxy DLL停止时返回非零退出码: {}", exit_code);
-                        }
-                    }
-                    Err(e) => {
-                        log_debug!("停止tun2proxy DLL失败: {}", e);
-                    }
+        match stop_result {
+            Ok(Ok(exit_code)) => {
+                if exit_code == 0 {
+                    log_debug!("tun2proxy DLL已成功停止");
+                } else {
+                    log_debug!("tun2proxy DLL停止时返回非零退出码: {}", exit_code);
                 }
             }
-            Err(_) => {
-                log_warn!("stop线程执行失败或panic");
+            Ok(Err(e)) => {
+                log_debug!("停止tun2proxy DLL失败: {}", e);
+            }
+            Err(panic_info) => {
+                log_error!("停止tun2proxy DLL时发生panic: {:?}", panic_info);
             }
         }
         
@@ -682,11 +645,25 @@ impl TunManager {
 
         log_info!("正在同步停止tun2proxy DLL");
         
-        // 使用DLL接口停止tun2proxy
-        if let Err(e) = tun2proxy_ffi::stop() {
-            log_warn!("停止tun2proxy DLL失败（同步）: {}", e);
-        } else {
-            log_info!("tun2proxy DLL已停止（同步）");
+        // 使用panic捕获机制调用DLL的stop函数
+        let stop_result = std::panic::catch_unwind(|| {
+            tun2proxy_ffi::stop()
+        });
+        
+        match stop_result {
+            Ok(Ok(exit_code)) => {
+                if exit_code == 0 {
+                    log_info!("tun2proxy DLL已成功停止（同步）");
+                } else {
+                    log_warn!("tun2proxy DLL停止时返回非零退出码（同步）: {}", exit_code);
+                }
+            }
+            Ok(Err(e)) => {
+                log_warn!("停止tun2proxy DLL失败（同步）: {}", e);
+            }
+            Err(panic_info) => {
+                log_error!("停止tun2proxy DLL时发生panic（同步）: {:?}", panic_info);
+            }
         }
 
         // 更新状态
@@ -706,27 +683,8 @@ impl TunManager {
     /// 
     /// # 返回值
     /// * `bool` - 是否运行中
-    pub async fn is_running(&self) -> bool {
-        let atomic_running = self.running.load(Ordering::SeqCst);
-        
-        // 如果原子状态为false，直接返回false
-        if !atomic_running {
-            return false;
-        }
-        
-        // 如果原子状态为true，还需要检查实际的状态
-        let status_running = {
-            let status = self.status.lock().unwrap();
-            status.is_running
-        };
-        
-        // 如果状态不一致，同步原子状态
-        if atomic_running != status_running {
-            self.running.store(status_running, Ordering::SeqCst);
-            log_warn!("TUN运行状态不一致，已同步: atomic={}, status={}", atomic_running, status_running);
-        }
-        
-        status_running
+    pub fn is_running(&self) -> bool {
+        self.running.load(Ordering::SeqCst)
     }
 
     /// 检查TUN设备是否正在运行（同步版本）
@@ -741,18 +699,16 @@ impl TunManager {
     /// 
     /// # 返回值
     /// * `TunStatus` - 设备状态
-    pub async fn get_status(&self) -> TunStatus {
-        let status = self.status.lock().unwrap();
-        status.clone()
+    pub fn get_status(&self) -> TunStatus {
+        self.status.lock().unwrap().clone()
     }
 
     /// 获取TUN设备配置
     /// 
     /// # 返回值
     /// * `TunConfig` - 设备配置
-    pub async fn get_config(&self) -> TunConfig {
-        let config = self.config.lock().unwrap();
-        config.clone()
+    pub fn get_config(&self) -> TunConfig {
+        self.config.lock().unwrap().clone()
     }
 
     /// 更新TUN设备配置
@@ -762,11 +718,11 @@ impl TunManager {
     /// 
     /// # 返回值
     /// * `Result<()>` - 更新结果
-    pub async fn update_config(&self, config: TunConfig) -> Result<()> {
-        let was_running = self.is_running().await;
+    pub fn update_config(&self, config: TunConfig) -> Result<()> {
+        let was_running = self.is_running();
         
         if was_running {
-            self.stop().await?;
+            self.stop()?;
         }
         
         {
@@ -775,7 +731,7 @@ impl TunManager {
         }
         
         if was_running && config.enabled {
-            self.start(config).await?;
+            self.start(config)?;
         }
         
         Ok(())
@@ -785,7 +741,7 @@ impl TunManager {
     /// 
     /// # 返回值
     /// * `bool` - DLL是否仍在运行
-    pub async fn check_process_status(&self) -> bool {
+    pub fn check_process_status(&self) -> bool {
         // 在DLL模式下，直接返回运行状态
         self.running.load(Ordering::SeqCst)
     }
