@@ -249,9 +249,23 @@ fn stop_without_lock() -> Result<i32> {
         Ok(dll_guard) => {
             match dll_guard.as_ref() {
                 Some(dll) => {
-                    let exit_code = unsafe { (dll.tun2proxy_stop)() };
-                    log_debug!("tun2proxy停止（无锁模式），退出码: {}", exit_code);
-                    Ok(exit_code)
+                    log_debug!("调用DLL停止函数（无锁模式）");
+                    
+                    // 使用std::panic::catch_unwind捕获可能的panic
+                    let stop_result = std::panic::catch_unwind(|| {
+                        unsafe { (dll.tun2proxy_stop)() }
+                    });
+                    
+                    match stop_result {
+                        Ok(exit_code) => {
+                            log_debug!("tun2proxy停止（无锁模式），退出码: {}", exit_code);
+                            Ok(exit_code)
+                        }
+                        Err(panic_info) => {
+                            log_error!("DLL停止函数发生panic: {:?}", panic_info);
+                            Err(anyhow::anyhow!("DLL停止函数发生panic"))
+                        }
+                    }
                 },
                 None => {
                     log_debug!("tun2proxy DLL未初始化");
@@ -263,18 +277,39 @@ fn stop_without_lock() -> Result<i32> {
             // 锁被占用，说明可能有运行中的TUN设备，使用阻塞方式获取锁
             log_debug!("检测到锁被占用，使用阻塞方式获取锁进行停止操作");
             
-            // 直接使用阻塞锁获取，虽然可能等待，但这是安全的方式
-            let dll_guard = dll_instance.lock().unwrap();
-            match dll_guard.as_ref() {
-                Some(dll) => {
-                    let exit_code = unsafe { (dll.tun2proxy_stop)() };
-                    log_debug!("tun2proxy阻塞停止，退出码: {}", exit_code);
-                    Ok(exit_code)
-                },
-                None => {
-                    log_debug!("tun2proxy DLL未初始化");
-                    Err(anyhow::anyhow!("tun2proxy DLL未初始化"))
-                },
+            // 使用阻塞锁获取，但添加错误处理
+            match dll_instance.lock() {
+                Ok(dll_guard) => {
+                    match dll_guard.as_ref() {
+                        Some(dll) => {
+                            log_debug!("调用DLL停止函数（阻塞模式）");
+                            
+                            // 使用std::panic::catch_unwind捕获可能的panic
+                            let stop_result = std::panic::catch_unwind(|| {
+                                unsafe { (dll.tun2proxy_stop)() }
+                            });
+                            
+                            match stop_result {
+                                Ok(exit_code) => {
+                                    log_debug!("tun2proxy阻塞停止，退出码: {}", exit_code);
+                                    Ok(exit_code)
+                                }
+                                Err(panic_info) => {
+                                    log_error!("DLL停止函数发生panic（阻塞模式）: {:?}", panic_info);
+                                    Err(anyhow::anyhow!("DLL停止函数发生panic（阻塞模式）"))
+                                }
+                            }
+                        },
+                        None => {
+                            log_debug!("tun2proxy DLL未初始化（阻塞模式）");
+                            Err(anyhow::anyhow!("tun2proxy DLL未初始化（阻塞模式）"))
+                        },
+                    }
+                }
+                Err(e) => {
+                    log_error!("获取DLL锁失败: {:?}", e);
+                    Err(anyhow::anyhow!("获取DLL锁失败: {:?}", e))
+                }
             }
         }
     }
@@ -533,6 +568,23 @@ pub fn run_with_cli_args(
 pub fn stop() -> Result<i32> {
     log_debug!("开始停止tun2proxy");
     
+    // 检查DLL是否已初始化
+    let dll_instance = get_tun2proxy_dll();
+    let is_dll_loaded = {
+        match dll_instance.try_lock() {
+            Ok(guard) => guard.is_some(),
+            Err(_) => {
+                log_warn!("无法获取DLL锁进行状态检查，假设DLL已加载");
+                true
+            }
+        }
+    };
+    
+    if !is_dll_loaded {
+        log_debug!("tun2proxy DLL未加载，无需停止");
+        return Ok(0);
+    }
+    
     // 使用绕过锁机制的停止函数，避免锁竞争问题
     let result = stop_without_lock();
     
@@ -561,22 +613,57 @@ pub fn cleanup_dll_instance() {
                 log_debug!("开始延迟清理tun2proxy DLL实例");
                 
                 // 使用异步任务延迟清理，给TUN设备足够时间完全停止
-                std::thread::spawn(move || {
+                let cleanup_result = std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_millis(1000));
                     
                     let dll_instance = get_tun2proxy_dll();
-                    if let Ok(mut dll_guard) = dll_instance.lock() {
-                        if dll_guard.is_some() {
-                            log_debug!("执行延迟清理：卸载tun2proxy DLL实例");
-                            *dll_guard = None;
-                            log_debug!("tun2proxy DLL实例已安全卸载");
+                    match dll_instance.lock() {
+                        Ok(mut dll_guard) => {
+                            if dll_guard.is_some() {
+                                log_debug!("执行延迟清理：卸载tun2proxy DLL实例");
+                                *dll_guard = None;
+                                log_debug!("tun2proxy DLL实例已安全卸载");
+                                true
+                            } else {
+                                log_debug!("DLL实例已被清理，无需重复操作");
+                                true
+                            }
+                        }
+                        Err(e) => {
+                            log_error!("延迟清理时获取DLL锁失败: {:?}", e);
+                            false
                         }
                     }
                 });
+                
+                // 不等待清理线程完成，避免阻塞主线程
+                // 但记录清理任务的启动
+                log_debug!("DLL清理任务已启动");
+            } else {
+                log_debug!("DLL实例已为空，无需清理");
             }
         },
         Err(_) => {
-            log_debug!("无法获取DLL实例锁，跳过清理操作");
+            log_debug!("无法获取DLL实例锁，可能有其他操作正在进行，延迟清理");
+            
+            // 如果无法获取锁，启动一个延迟更长的清理任务
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(2000));
+                
+                let dll_instance = get_tun2proxy_dll();
+                match dll_instance.lock() {
+                    Ok(mut dll_guard) => {
+                        if dll_guard.is_some() {
+                            log_debug!("执行延迟清理（锁竞争后）：卸载tun2proxy DLL实例");
+                            *dll_guard = None;
+                            log_debug!("tun2proxy DLL实例已安全卸载（锁竞争后）");
+                        }
+                    }
+                    Err(e) => {
+                        log_error!("延迟清理（锁竞争后）时获取DLL锁失败: {:?}", e);
+                    }
+                }
+            });
         }
     }
 }

@@ -19,7 +19,7 @@ use tokio::sync::broadcast;
 use std::collections::VecDeque;
 
 // 导入日志宏
-use crate::{log_info, log_error};
+use crate::{log_info, log_error, log_warn, log_debug};
 
 
 
@@ -250,64 +250,129 @@ impl ProxyManager {
         // 停止TUN模式（如果正在运行）
         let tun_manager = TunManager::instance();
         if tun_manager.is_running().await {
-            if let Err(e) = tun_manager.stop().await {
-                log_error!("停止TUN模式失败: {}", e);
+            log_info!("正在停止TUN模式...");
+            match tun_manager.stop().await {
+                Ok(_) => {
+                    log_info!("TUN模式已成功停止");
+                    // 等待TUN完全停止，避免与代理停止产生竞态条件
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                }
+                Err(e) => {
+                    log_error!("停止TUN模式失败: {}", e);
+                    // 即使TUN停止失败，也继续停止代理，但增加延迟确保安全
+                    tokio::time::sleep(Duration::from_millis(1000)).await;
+                }
             }
         }
         // 获取进程信息并立即释放锁
         let (child_opt, pid_opt) = {
-            let mut process = self.process.lock().unwrap();
-            let child = process.take();
-            let pid = child.as_ref().map(|c| c.id());
-            (child, pid)
+            match self.process.lock() {
+                Ok(mut process) => {
+                    let child = process.take();
+                    let pid = child.as_ref().and_then(|c| c.id());
+                    (child, pid)
+                }
+                Err(e) => {
+                    log_error!("获取进程锁失败: {}", e);
+                    return Err(anyhow::anyhow!("获取进程锁失败: {}", e));
+                }
+            }
         };
         
         if let (Some(mut child), Some(pid)) = (child_opt, pid_opt) {
+            log_info!("正在停止Xray进程 (PID: {})...", pid);
+            
             // 首先尝试正常终止进程
-            if let Err(_) = child.kill().await {
-                // 如果正常终止失败，使用系统命令强制终止
-                self.force_kill_process(pid.expect("Failed to get process ID")).await?;
-            } else {
-                // 等待进程退出，如果超时则强制终止
-                let wait_result = tokio::time::timeout(
-                    Duration::from_secs(3),
-                    child.wait()
-                ).await;
-                
-                match wait_result {
-                    Ok(Ok(_)) => {
-                        // 进程正常退出
+            match child.kill().await {
+                Ok(_) => {
+                    log_debug!("已发送终止信号给进程 {}", pid);
+                    
+                    // 等待进程退出，如果超时则强制终止
+                    let wait_result = tokio::time::timeout(
+                        Duration::from_secs(3),
+                        child.wait()
+                    ).await;
+                    
+                    match wait_result {
+                        Ok(Ok(exit_status)) => {
+                            log_info!("进程 {} 正常退出，状态: {}", pid, exit_status);
+                        }
+                        Ok(Err(e)) => {
+                             log_warn!("等待进程 {} 退出时发生错误: {}", pid, e);
+                             // 尝试强制终止
+                             if let Err(force_err) = self.force_kill_process(pid).await {
+                                 log_error!("强制终止进程 {} 失败: {}", pid, force_err);
+                             }
+                         }
+                         Err(_) => {
+                             log_warn!("等待进程 {} 退出超时，尝试强制终止", pid);
+                             // 超时，强制终止
+                             if let Err(force_err) = self.force_kill_process(pid).await {
+                                 log_error!("强制终止进程 {} 失败: {}", pid, force_err);
+                             }
+                         }
                     }
-                    _ => {
-                        // 超时或等待失败，强制终止
-                        self.force_kill_process(pid.expect("Failed to get process ID")).await?;
+                }
+                Err(e) => {
+                    log_warn!("正常终止进程 {} 失败: {}，尝试强制终止", pid, e);
+                    // 如果正常终止失败，使用系统命令强制终止
+                    if let Err(force_err) = self.force_kill_process(pid).await {
+                        log_error!("强制终止进程 {} 失败: {}", pid, force_err);
+                        // 不返回错误，继续清理其他资源
                     }
                 }
             }
+        } else {
+            log_debug!("没有运行中的Xray进程需要停止");
         }
 
         // 额外确保：查找并终止所有 xray 进程
-        self.kill_all_xray_processes().await?;
+        if let Err(e) = self.kill_all_xray_processes().await {
+            log_error!("清理残留Xray进程失败: {}", e);
+            // 不返回错误，继续清理其他资源
+        }
 
         // 清除启动时间
-        {
-            let mut start_time = self.start_time.lock().unwrap();
-            *start_time = None;
+        match self.start_time.lock() {
+            Ok(mut start_time) => {
+                *start_time = None;
+                log_debug!("已清除启动时间");
+            }
+            Err(e) => {
+                log_error!("清除启动时间失败: {}", e);
+            }
         }
 
         // 清除当前服务器
-        {
-            let mut current_server = self.current_server.lock().unwrap();
-            *current_server = None;
+        match self.current_server.lock() {
+            Ok(mut current_server) => {
+                *current_server = None;
+                log_debug!("已清除当前服务器信息");
+            }
+            Err(e) => {
+                log_error!("清除当前服务器信息失败: {}", e);
+            }
         }
 
         // 清理日志流资源
-        {
-            let mut log_sender = self.log_sender.lock().unwrap();
-            *log_sender = None;
-            
-            let mut log_buffer = self.log_buffer.lock().unwrap();
-            log_buffer.clear();
+        match self.log_sender.lock() {
+            Ok(mut log_sender) => {
+                *log_sender = None;
+                log_debug!("已清理日志发送器");
+            }
+            Err(e) => {
+                log_error!("清理日志发送器失败: {}", e);
+            }
+        }
+        
+        match self.log_buffer.lock() {
+            Ok(mut log_buffer) => {
+                log_buffer.clear();
+                log_debug!("已清理日志缓冲区");
+            }
+            Err(e) => {
+                log_error!("清理日志缓冲区失败: {}", e);
+            }
         }
 
         log_info!("Xray Core 已停止");
