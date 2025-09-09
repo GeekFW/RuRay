@@ -283,43 +283,29 @@ impl ProxyManager {
             log_info!("正在停止Xray进程 (PID: {})...", pid);
             
             // 首先尝试正常终止进程
-            match child.kill().await {
+            // 注意：child.kill() 发送 SIGTERM 信号，某些情况下可能导致进程异常退出
+            // 我们先尝试使用系统命令进行更安全的终止
+            log_debug!("尝试使用系统命令终止进程 {}", pid);
+            match self.force_kill_process(pid).await {
                 Ok(_) => {
-                    log_debug!("已发送终止信号给进程 {}", pid);
+                    log_info!("进程 {} 终止命令已发送", pid);
                     
-                    // 等待进程退出，如果超时则强制终止
-                    let wait_result = tokio::time::timeout(
-                        Duration::from_secs(3),
-                        child.wait()
-                    ).await;
+                    // 等待一小段时间让进程完全退出
+                    tokio::time::sleep(Duration::from_millis(500)).await;
                     
-                    match wait_result {
-                        Ok(Ok(exit_status)) => {
-                            log_info!("进程 {} 正常退出，状态: {}", pid, exit_status);
-                        }
-                        Ok(Err(e)) => {
-                             log_warn!("等待进程 {} 退出时发生错误: {}", pid, e);
-                             // 尝试强制终止
-                             if let Err(force_err) = self.force_kill_process(pid).await {
-                                 log_error!("强制终止进程 {} 失败: {}", pid, force_err);
-                             }
-                         }
-                         Err(_) => {
-                             log_warn!("等待进程 {} 退出超时，尝试强制终止", pid);
-                             // 超时，强制终止
-                             if let Err(force_err) = self.force_kill_process(pid).await {
-                                 log_error!("强制终止进程 {} 失败: {}", pid, force_err);
-                             }
-                         }
+                    // 验证进程是否已经终止
+                    let mut system = sysinfo::System::new();
+                    system.refresh_processes();
+                    
+                    if system.process(sysinfo::Pid::from_u32(pid)).is_some() {
+                        log_warn!("进程 {} 仍在运行，可能终止失败", pid);
+                    } else {
+                        log_info!("进程 {} 已成功终止", pid);
                     }
                 }
                 Err(e) => {
-                    log_warn!("正常终止进程 {} 失败: {}，尝试强制终止", pid, e);
-                    // 如果正常终止失败，使用系统命令强制终止
-                    if let Err(force_err) = self.force_kill_process(pid).await {
-                        log_error!("强制终止进程 {} 失败: {}", pid, force_err);
-                        // 不返回错误，继续清理其他资源
-                    }
+                    log_error!("终止进程 {} 失败: {}", pid, e);
+                    // 不返回错误，继续清理其他资源
                 }
             }
         } else {
@@ -379,20 +365,32 @@ impl ProxyManager {
         Ok(())
     }
 
-    /// 强制终止指定PID的进程
+    /// 安全终止指定PID的进程
     async fn force_kill_process(&self, pid: u32) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
+            // 首先尝试温和终止
             let output = TokioCommand::new("taskkill")
-                .args(&["/F", "/PID", &pid.to_string()])
+                .args(&["/PID", &pid.to_string()])
                 .creation_flags(0x08000000) // CREATE_NO_WINDOW
                 .output()
                 .await
                 .context("执行 taskkill 命令失败")?;
             
             if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(anyhow::anyhow!("强制终止进程失败: {}", stderr));
+                // 如果温和终止失败，再尝试强制终止
+                log_warn!("温和终止进程 {} 失败，尝试强制终止", pid);
+                let force_output = TokioCommand::new("taskkill")
+                    .args(&["/F", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .output()
+                    .await
+                    .context("执行强制 taskkill 命令失败")?;
+                
+                if !force_output.status.success() {
+                    let stderr = String::from_utf8_lossy(&force_output.stderr);
+                    return Err(anyhow::anyhow!("强制终止进程失败: {}", stderr));
+                }
             }
         }
         
